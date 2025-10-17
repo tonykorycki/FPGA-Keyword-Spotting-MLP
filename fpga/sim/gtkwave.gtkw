@@ -1,0 +1,44 @@
+[*]
+[*] GTKWave Analyzer v3.3.100 (w)1999-2019 BSI
+[*]
+[dumpfile] "fft_sim.vcd"
+[dumpfile_mtime] "Fri Oct 17 10:30:00 2025"
+[dumpfile_size] 12345678
+[savefile] "gtkwave.gtkw"
+[timestart] 0
+[size] 1920 1080
+[pos] -1 -1
+*-15.000000 27500 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] tb_fft.
+[sst_width] 214
+[signals_width] 174
+[sst_expanded] 1
+[sst_vpaned_height] 315
+@28
+tb_fft.clk
+tb_fft.rst_n
+tb_fft.start
+tb_fft.done
+@24
+tb_fft.fft_core_inst.stage_counter[4:0]
+@28
+tb_fft.fft_core_inst.computing
+@420
+tb_fft.x_real(0)[15:0]
+tb_fft.x_real(1)[15:0]
+tb_fft.x_real(2)[15:0]
+tb_fft.x_real(3)[15:0]
+@420
+tb_fft.y_real(0)[15:0]
+tb_fft.y_real(1)[15:0]
+tb_fft.y_real(2)[15:0]
+tb_fft.y_real(3)[15:0]
+tb_fft.y_real(4)[15:0]
+@420
+tb_fft.y_imag(0)[15:0]
+tb_fft.y_imag(1)[15:0]
+tb_fft.y_imag(2)[15:0]
+tb_fft.y_imag(3)[15:0]
+tb_fft.y_imag(4)[15:0]
+[pattern_trace] 1
+[pattern_trace] 0
