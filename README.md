@@ -61,6 +61,34 @@ The Python scripts provide a complete pipeline for:
 4. Quantizing the model for FPGA implementation
 5. Generating memory initialization files for the FPGA
 
+#### Running the Complete Pipeline
+
+To run the entire model training pipeline with a single command, use `run_pipeline.py`:
+
+```
+python run_pipeline.py
+```
+
+This script will:
+1. Convert your raw recordings to the standard format
+2. Extract MFCC features from the audio files
+3. Train the neural network model
+4. Quantize the model for FPGA implementation
+
+You can customize the pipeline with these options:
+```
+python run_pipeline.py --epochs 100 --batch_size 64 --hidden_size 128 --bits 16 --visualize
+```
+
+Available options:
+- `--skip_convert`: Skip the audio conversion step (if already done)
+- `--skip_features`: Skip the feature extraction step (if already done)
+- `--epochs`: Number of training epochs (default: 50)
+- `--batch_size`: Training batch size (default: 32) 
+- `--hidden_size`: Size of the hidden layer (default: 64)
+- `--bits`: Bit precision for quantization (default: 8)
+- `--visualize`: Show visualizations during feature extraction
+
 ## Recording data
 
 If you're collecting samples with Audacity (or a similar recorder) for the three conditions used by this project, follow these recommendations to keep your dataset consistent and easy to use:

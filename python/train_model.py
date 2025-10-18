@@ -15,8 +15,9 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, classification_report
 import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers, models
+# Import keras directly - this is the recommended way in TF 2.19+
+import keras
+from keras import layers, models
 
 def parse_args():
     """Parse command line arguments."""
@@ -85,7 +86,7 @@ def plot_confusion_matrix(y_true, y_pred):
     cm = confusion_matrix(y_true, y_pred)
     
     plt.figure(figsize=(8, 6))
-    plt.imshow(cm, interpolation='nearest', cmap=plt.cm.Blues)
+    plt.imshow(cm, interpolation='nearest', cmap='Blues')
     plt.title('Confusion matrix')
     plt.colorbar()
     
@@ -139,7 +140,7 @@ def main():
         epochs=args.epochs,
         batch_size=args.batch_size,
         validation_split=0.2,
-        verbose=1
+        verbose="1"
     )
     
     # Evaluate model

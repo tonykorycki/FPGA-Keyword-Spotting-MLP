@@ -12,7 +12,9 @@ import os
 import argparse
 import numpy as np
 import tensorflow as tf
-from tensorflow import keras
+# Import keras directly - this is the recommended way in TF 2.19+
+import keras
+from keras import layers, models
 import matplotlib.pyplot as plt
 
 def parse_args():
@@ -58,7 +60,7 @@ def quantize_model(model, bits=8):
     
     # Process each layer in the model
     for layer in model.layers:
-        if isinstance(layer, keras.layers.Dense):
+        if isinstance(layer, layers.Dense):
             # Quantize weights
             weights, weight_scale = quantize_weights(layer.get_weights()[0], bits)
             quantized_weights.append(weights)
@@ -118,7 +120,10 @@ def main():
     
     # Load the model
     print(f"Loading model from {args.model_path}")
-    model = keras.models.load_model(args.model_path)
+    model = models.load_model(args.model_path)
+    if model is None:
+        print("Error: Failed to load the model.")
+        exit(1)
     model.summary()
     
     # Quantize the model

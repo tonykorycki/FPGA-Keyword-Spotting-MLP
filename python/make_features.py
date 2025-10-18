@@ -13,6 +13,7 @@ import glob
 import argparse
 import numpy as np
 import librosa
+import librosa.display
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import pickle
@@ -27,9 +28,9 @@ FRAME_LENGTH = 512
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Extract features from audio samples")
-    parser.add_argument("--input_dir", type=str, default="../data/raw",
-                       help="Directory containing raw audio files")
-    parser.add_argument("--output_dir", type=str, default="../data/features",
+    parser.add_argument("--input_dir", type=str, default="../data/processed",
+                       help="Directory containing processed audio files")
+    parser.add_argument("--output_dir", type=str, default="../data/processed/features",
                        help="Directory to save extracted features")
     parser.add_argument("--visualize", action="store_true",
                        help="Visualize the extracted features")
