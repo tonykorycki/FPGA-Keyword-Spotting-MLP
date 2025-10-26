@@ -65,7 +65,7 @@ def extract_fft_features(audio_file):
     return np.array(frames, dtype=np.float32)
 
 
-def visualize_all_classes(label_map, input_dir):
+def visualize_spectrograms(label_map, input_dir):
     """Show sample + average spectrogram per class (time–frequency plots)."""
     n_classes = len(label_map)
     total_plots = n_classes * 2
@@ -137,8 +137,9 @@ def main():
     print(f"📂 Found label folders with binary mapping: {label_map}")
 
     all_features, all_labels = [], []
-    all_actual_labels = []  # per-sample actual label indices
+    all_actual_labels = [] 
     visualize_data = []
+    filenames = []
 
     for label_name, label_value in label_map.items():
         folder = os.path.join(args.input_dir, label_name)
@@ -155,6 +156,9 @@ def main():
             feature_vec = fft_frames.mean(axis=0)
             all_features.append(feature_vec)
             all_labels.append(label_value)
+            filenames.append(f"{label_name}/{os.path.basename(wav_path)}")
+
+
             # Save the actual label index (folder-based)
             all_actual_labels.append(actual_label_to_idx[label_name])
             all_class_spectra.append(fft_frames)
@@ -176,6 +180,8 @@ def main():
     # New: per-sample actual labels and their names
     np.save(os.path.join(args.output_dir, "labels_actual.npy"), labels_actual)
     np.save(os.path.join(args.output_dir, "label_types.npy"), label_types)
+    np.save(os.path.join(args.output_dir, "filenames.npy"), np.array(filenames))
+
 
     print("\n✅ Extraction complete!")
     print(f"Feature shape: {features.shape}, Labels shape: {labels.shape}")
@@ -195,7 +201,7 @@ def main():
 
     # --- Visualization section ---
     if args.visualize and visualize_data:
-        visualize_all_classes(label_map, args.input_dir)
+        visualize_spectrograms(label_map, args.input_dir)
 
 
 if __name__ == "__main__":

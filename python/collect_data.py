@@ -17,6 +17,7 @@ import argparse
 import numpy as np
 import pyaudio
 import matplotlib.pyplot as plt
+from utils.plotting import visualize_audio
 
 # Constants
 SAMPLE_RATE = 16000
@@ -74,16 +75,7 @@ def save_wav(filename, audio_data, sample_rate=SAMPLE_RATE, channels=CHANNELS):
         wf.setframerate(sample_rate)
         wf.writeframes(audio_data)
 
-def visualize_audio(audio_data):
-    """Visualize the recorded audio waveform."""
-    audio_array = np.frombuffer(audio_data, dtype=np.int16)
-    plt.figure(figsize=(10, 4))
-    plt.plot(audio_array)
-    plt.title("Recorded Audio Waveform")
-    plt.xlabel("Sample")
-    plt.ylabel("Amplitude")
-    plt.tight_layout()
-    plt.show()
+
 
 def main():
     args = parse_args()
