@@ -27,32 +27,45 @@ module tb_inference;
     
     reg clk;
     reg rst_n;
-    reg [7:0] features [0:256];
+    reg [7:0] features_array [0:256];  // Temporary array for test loading
+    reg [2055:0] features_packed;      // Packed vector for DUT
     reg features_valid;
     
     wire inference_done;
     wire prediction;
-    wire [31:0] logits [0:1];
+    wire [63:0] logits_packed;         // Packed logits from DUT
+    
+    // Unpack logits for display
+    wire signed [31:0] logit0 = $signed(logits_packed[31:0]);
+    wire signed [31:0] logit1 = $signed(logits_packed[63:32]);
+    
+    // Pack features before inference
+    integer pack_idx;
+    always @(*) begin
+        for (pack_idx = 0; pack_idx < 257; pack_idx = pack_idx + 1) begin
+            features_packed[pack_idx*8 +: 8] = features_array[pack_idx];
+        end
+    end
     
     //=========================================================================
     // DUT Instantiation
     //=========================================================================
     
     inference #(
-        .LAYER0_WEIGHTS_FILE("../../models/mem/layer0_weights.mem"),
-        .LAYER0_BIAS_FILE("../../models/mem/layer0_bias.mem"),
-        .LAYER1_WEIGHTS_FILE("../../models/mem/layer1_weights.mem"),
-        .LAYER1_BIAS_FILE("../../models/mem/layer1_bias.mem"),
-        .LAYER2_WEIGHTS_FILE("../../models/mem/layer2_weights.mem"),
-        .LAYER2_BIAS_FILE("../../models/mem/layer2_bias.mem")
+        .LAYER0_WEIGHTS_FILE("C:/Users/koryc/fpga-kws/models/mem/layer0_weights.mem"),
+        .LAYER0_BIAS_FILE("C:/Users/koryc/fpga-kws/models/mem/layer0_bias.mem"),
+        .LAYER1_WEIGHTS_FILE("C:/Users/koryc/fpga-kws/models/mem/layer1_weights.mem"),
+        .LAYER1_BIAS_FILE("C:/Users/koryc/fpga-kws/models/mem/layer1_bias.mem"),
+        .LAYER2_WEIGHTS_FILE("C:/Users/koryc/fpga-kws/models/mem/layer2_weights.mem"),
+        .LAYER2_BIAS_FILE("C:/Users/koryc/fpga-kws/models/mem/layer2_bias.mem")
     ) dut (
         .clk(clk),
         .rst_n(rst_n),
-        .features(features),
+        .features(features_packed),
         .features_valid(features_valid),
         .inference_done(inference_done),
         .prediction(prediction),
-        .logits(logits)
+        .logits(logits_packed)
     );
     
     //=========================================================================
@@ -89,7 +102,7 @@ module tb_inference;
     
     initial begin
         // Load input features (int8 hex values)
-        file_in = $fopen("../../models/test_input_hex.txt", "r");
+        file_in = $fopen("C:/Users/koryc/fpga-kws/models/test_input_hex.txt", "r");
         if (file_in == 0) begin
             $display("ERROR: Could not open test_input_hex.txt");
             $display("Run: python python/convert_test_vectors.py");
@@ -106,7 +119,7 @@ module tb_inference;
         $display("Loaded %0d test input vectors", NUM_TEST_VECTORS);
         
         // Load expected outputs (0 or 1)
-        file_out = $fopen("../../models/test_output_ref.txt", "r");
+        file_out = $fopen("C:/Users/koryc/fpga-kws/models/test_output_ref.txt", "r");
         if (file_out == 0) begin
             $display("ERROR: Could not open test_output_ref.txt");
             $display("Run: python python/convert_test_vectors.py");
@@ -149,7 +162,7 @@ module tb_inference;
             
             // Load features
             for (j = 0; j < NUM_FEATURES; j = j + 1) begin
-                features[j] = test_inputs[test_idx][j];
+                features_array[j] = test_inputs[test_idx][j];
             end
             
             // Start inference
@@ -177,12 +190,12 @@ module tb_inference;
                 if (test_idx < 10 || (test_idx % 10 == 0)) begin
                     $display("Test %3d: PASS | Pred=%0d, Expected=%0d | Logits=[%0d, %0d] | Cycles=%0d", 
                              test_idx, prediction, expected_outputs[test_idx], 
-                             $signed(logits[0]), $signed(logits[1]), cycle_count);
+                             logit0, logit1, cycle_count);
                 end
             end else begin
                 $display("Test %3d: FAIL | Pred=%0d, Expected=%0d | Logits=[%0d, %0d] | Cycles=%0d", 
                          test_idx, prediction, expected_outputs[test_idx],
-                         $signed(logits[0]), $signed(logits[1]), cycle_count);
+                         logit0, logit1, cycle_count);
             end
             
             // Small delay between tests

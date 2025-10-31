@@ -30,27 +30,39 @@ module inference #(
     parameter signed [31:0] L1_REQUANT_SCALE = 32'd141,   // 0.002151927910745144 * 65536
     parameter signed [31:0] L2_REQUANT_SCALE = 32'd282,   // 0.004303930327296257 * 65536
     
-    // Memory file paths
-    parameter LAYER0_WEIGHTS_FILE = "../../models/mem/layer0_weights.mem",
-    parameter LAYER0_BIAS_FILE    = "../../models/mem/layer0_bias.mem",
-    parameter LAYER1_WEIGHTS_FILE = "../../models/mem/layer1_weights.mem",
-    parameter LAYER1_BIAS_FILE    = "../../models/mem/layer1_bias.mem",
-    parameter LAYER2_WEIGHTS_FILE = "../../models/mem/layer2_weights.mem",
-    parameter LAYER2_BIAS_FILE    = "../../models/mem/layer2_bias.mem"
+    // Memory file paths (absolute for compatibility with both Icarus and Vivado)
+    parameter LAYER0_WEIGHTS_FILE = "C:/Users/koryc/fpga-kws/models/mem/layer0_weights.mem",
+    parameter LAYER0_BIAS_FILE    = "C:/Users/koryc/fpga-kws/models/mem/layer0_bias.mem",
+    parameter LAYER1_WEIGHTS_FILE = "C:/Users/koryc/fpga-kws/models/mem/layer1_weights.mem",
+    parameter LAYER1_BIAS_FILE    = "C:/Users/koryc/fpga-kws/models/mem/layer1_bias.mem",
+    parameter LAYER2_WEIGHTS_FILE = "C:/Users/koryc/fpga-kws/models/mem/layer2_weights.mem",
+    parameter LAYER2_BIAS_FILE    = "C:/Users/koryc/fpga-kws/models/mem/layer2_bias.mem"
 ) (
     input  wire        clk,                    // System clock
     input  wire        rst_n,                  // Active-low reset
     
     // Input interface
-    input  wire [7:0]  features [0:256],       // 257 int8 input features
-    input  wire        features_valid,         // Start inference
+    input  wire [2055:0] features,             // 257 int8 input features (257*8 = 2056 bits)
+    input  wire          features_valid,       // Start inference
     
     // Output interface
     output reg         inference_done,         // Inference complete (1 cycle pulse)
     output reg         prediction,             // Classification result (0 or 1)
-    output reg  [31:0] logits [0:1]            // Raw output scores (for debugging)
+    output reg  [63:0] logits                  // Raw output scores: [31:0]=logit[0], [63:32]=logit[1]
 );
 
+    //=========================================================================
+    // Internal feature buffer (unpack the input vector)
+    //=========================================================================
+    reg signed [7:0] features_unpacked [0:256];
+    
+    integer k;
+    always @(*) begin
+        for (k = 0; k < 257; k = k + 1) begin
+            features_unpacked[k] = features[k*8 +: 8];
+        end
+    end
+    
     //=========================================================================
     // Weight and Bias Memory
     //=========================================================================
@@ -177,9 +189,7 @@ module inference #(
             first_mac <= 1'b0;
             
             // Clear outputs
-            for (i = 0; i < 2; i = i + 1) begin
-                logits[i] <= 32'd0;
-            end
+            logits <= 64'd0;
             
         end else begin
             // Default values
@@ -200,7 +210,7 @@ module inference #(
                 // LOAD_INPUT: Copy input features to buffer
                 //-------------------------------------------------------------
                 STATE_LOAD_INPUT: begin
-                    input_buffer[input_idx] <= $signed(features[input_idx]);
+                    input_buffer[input_idx] <= $signed(features_unpacked[input_idx]);
                     
                     if (input_idx == L0_IN - 1) begin
                         // All inputs loaded, start Layer 0
@@ -355,8 +365,9 @@ module inference #(
                 // ARGMAX: Compare logits and make prediction
                 //-------------------------------------------------------------
                 STATE_ARGMAX: begin
-                    logits[0] <= layer2_output[0];
-                    logits[1] <= layer2_output[1];
+                    // Pack logits into output vector: [31:0]=logit[0], [63:32]=logit[1]
+                    logits[31:0]  <= {{24{layer2_output[0][7]}}, layer2_output[0]};  // Sign-extend int8 to int32
+                    logits[63:32] <= {{24{layer2_output[1][7]}}, layer2_output[1]};
                     
                     // Prediction = argmax(logit[0], logit[1])
                     prediction <= (layer2_output[1] > layer2_output[0]) ? 1'b1 : 1'b0;

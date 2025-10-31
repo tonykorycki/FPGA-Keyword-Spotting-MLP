@@ -42,13 +42,13 @@ webtalk.jou
 webtalk.log
 
 # Vivado - Run directories (synthesis/implementation outputs)
-*.runs/synth_*/
-*.runs/impl_*/
-*.runs/.jobs/
+**/*.runs/synth_*/
+**/*.runs/impl_*/
+**/*.runs/.jobs/
 
 # Vivado - Source file copies (originals are in fpga/rtl/, fpga/tb/, models/mem/)
-*.srcs/sources_1/imports/
-*.srcs/sim_1/imports/
+**/*.srcs/sources_1/imports/
+**/*.srcs/sim_1/imports/
 
 # Vivado - Generated files
 *.jou
