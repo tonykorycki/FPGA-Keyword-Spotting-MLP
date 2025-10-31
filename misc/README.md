@@ -1,4 +1,31 @@
-Misc experiments and visualization notes
+# Miscellaneous Utilities
+
+This directory contains experimental scripts and visualization tools.
+
+## Contents
+
+### `fft_visualize.py`
+
+FFT visualization and testing utility for verifying FFT implementation.
+
+**Usage:**
+```bash
+python misc/fft_visualize.py
+```
+
+Generates plots showing:
+- Time-domain waveforms
+- Frequency-domain spectrum
+- FFT magnitude response
+
+Useful for:
+- Debugging FFT algorithms
+- Verifying FFT output correctness
+- Understanding frequency characteristics of audio samples
+
+## Notes
+
+This directory is for experiments and quick scripts that don't fit into the main pipeline. Tools here may be rough/undocumented.
 
 Use this folder for small experiments that don't belong in the main pipeline. Example content:
 
