@@ -28,30 +28,56 @@ ENV/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# Vivado / FPGA
+# Vivado / FPGA - Build artifacts
 *.cache/
 *.hw/
-*.runs/
 *.ip_user_files/
 *.sim/
+.Xil/
+.hbs/
+xgui/
+xsim.dir/
+webtalk/
+webtalk.jou
+webtalk.log
+
+# Vivado - Run directories (synthesis/implementation outputs)
+*.runs/synth_*/
+*.runs/impl_*/
+*.runs/.jobs/
+
+# Vivado - Source file copies (originals are in fpga/rtl/, fpga/tb/, models/mem/)
+*.srcs/sources_1/imports/
+*.srcs/sim_1/imports/
+
+# Vivado - Generated files
 *.jou
 *.log
 *.str
 *.backup.*
 *.debug
-*.Xil/
-xsim.dir/
 xvlog.log
 xvlog.pb
 xsim*.jou
 xsim*.log
-webtalk*.jou
-webtalk*.log
 vivado*.jou
 vivado*.log
-.Xil/
-.hbs/
-xgui/
+vivado*.pb
+*.wdf
+*.pb
+*.dcp
+*.vds
+ISEWrap.js
+ISEWrap.sh
+rundef.js
+runme.bat
+runme.sh
+gen_run.xml
+htr.txt
+__synthesis_is_running__
+__synthesis_is_complete__
+
+# Vivado - Output products (can be regenerated)
 *.bit
 *.bin
 *.mcs
@@ -59,7 +85,18 @@ xgui/
 *.ltx
 *.xsa
 *.tar.gz
+
+# Vivado - Reports (keep synthesis utilization reports)
 *.rpt
+!*utilization_synth.rpt
+
+# Keep important Vivado project files
+!*.tcl
+!*.xpr
+!*.xdc
+!*.v
+!*.vh
+!*.sv
 
 # Icarus Verilog simulation
 *.vvp
