@@ -84,8 +84,8 @@ def int_inference(x, weights, scales):
             x_q = relu_int8(x_q)
     
     # Final layer output is still int8, but represents logits
-    # Return argmax for classification
-    return np.argmax(x_q)
+    # Return both logits and argmax for classification
+    return np.argmax(x_q), x_q
 
 
 def main():
@@ -106,14 +106,17 @@ def main():
         print(f"  Layer {i}: weights {w_shape}, bias {b_shape}")
 
     preds = []
+    logits = []
     for i, x in enumerate(X):
-        pred = int_inference(x, weights, scales)
+        pred, logit = int_inference(x, weights, scales)
         preds.append(pred)
+        logits.append(logit)
         
         if i % 1000 == 0:
             print(f"  Processed {i}/{len(X)} samples...")
 
     preds = np.array(preds)
+    logits = np.array(logits)
     acc = np.mean(preds == y)
     print(f"\n✅ Quantized fixed-point accuracy: {acc * 100:.2f}%")
 
@@ -127,9 +130,11 @@ def main():
     test_samples = min(100, len(X))
     np.save(os.path.join(model_dir, "test_input.npy"), X[:test_samples])
     np.save(os.path.join(model_dir, "test_output.npy"), preds[:test_samples])
+    np.save(os.path.join(model_dir, "test_logits.npy"), logits[:test_samples])
     print(f"\n💾 Saved {test_samples} golden test vectors to:")
     print(f"  {model_dir}/test_input.npy")
     print(f"  {model_dir}/test_output.npy")
+    print(f"  {model_dir}/test_logits.npy")
 
 
 if __name__ == "__main__":

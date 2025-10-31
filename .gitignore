@@ -61,6 +61,12 @@ xgui/
 *.tar.gz
 *.rpt
 
+# Icarus Verilog simulation
+*.vvp
+*.vcd
+inference_sim
+fft_sim
+
 # System / IDE
 .DS_Store
 .vscode/

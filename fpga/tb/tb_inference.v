@@ -1,100 +1,230 @@
-// Inference Module Testbench
-// Author: 
-// Date: October 17, 2025
+//=============================================================================
+// Testbench for Neural Network Inference Engine
+//=============================================================================
+// Tests the inference module against golden reference from Python
+// Loads test vectors from test_input_hex.txt (quantized int8 features)
+// Compares output predictions against test_output_ref.txt
+//
+// Author: Tony Korycki
+// Date: October 31, 2025
+//=============================================================================
 
-`timescale 1ns / 1ps
+`timescale 1ns/1ps
 
 module tb_inference;
+
+    //=========================================================================
     // Parameters
-    localparam NUM_FEATURES = 32;
-    localparam CLOCK_PERIOD = 10; // 100 MHz clock
+    //=========================================================================
     
-    // Testbench signals
+    parameter CLK_PERIOD = 10;  // 100 MHz clock
+    parameter NUM_TEST_VECTORS = 100;
+    parameter NUM_FEATURES = 257;
+    
+    //=========================================================================
+    // Signals
+    //=========================================================================
+    
     reg clk;
     reg rst_n;
-    reg [7:0] features [0:NUM_FEATURES-1];
+    reg [7:0] features [0:256];
     reg features_valid;
-    wire inference_done;
-    wire result;
     
-    // Instantiate the inference module
-    inference inference_inst (
+    wire inference_done;
+    wire prediction;
+    wire [31:0] logits [0:1];
+    
+    //=========================================================================
+    // DUT Instantiation
+    //=========================================================================
+    
+    inference #(
+        .LAYER0_WEIGHTS_FILE("../../models/mem/layer0_weights.mem"),
+        .LAYER0_BIAS_FILE("../../models/mem/layer0_bias.mem"),
+        .LAYER1_WEIGHTS_FILE("../../models/mem/layer1_weights.mem"),
+        .LAYER1_BIAS_FILE("../../models/mem/layer1_bias.mem"),
+        .LAYER2_WEIGHTS_FILE("../../models/mem/layer2_weights.mem"),
+        .LAYER2_BIAS_FILE("../../models/mem/layer2_bias.mem")
+    ) dut (
         .clk(clk),
         .rst_n(rst_n),
         .features(features),
         .features_valid(features_valid),
         .inference_done(inference_done),
-        .result(result)
+        .prediction(prediction),
+        .logits(logits)
     );
     
-    // Clock generation
+    //=========================================================================
+    // Test Data Storage
+    //=========================================================================
+    
+    // Input test vectors (quantized int8 features)
+    reg [7:0] test_inputs [0:NUM_TEST_VECTORS-1][0:NUM_FEATURES-1];
+    
+    // Expected outputs (ground truth predictions)
+    reg expected_outputs [0:NUM_TEST_VECTORS-1];
+    
+    // Results tracking
+    integer num_correct;
+    integer num_total;
+    
+    //=========================================================================
+    // Clock Generation
+    //=========================================================================
+    
     initial begin
         clk = 0;
-        forever #(CLOCK_PERIOD/2) clk = ~clk;
+        forever #(CLK_PERIOD/2) clk = ~clk;
     end
     
-    // Test stimulus
+    //=========================================================================
+    // Load Test Vectors
+    //=========================================================================
+    
+    integer i, j;
+    integer file_in, file_out, scan_result;
+    reg [7:0] temp_byte;
+    reg temp_pred;
+    
+    initial begin
+        // Load input features (int8 hex values)
+        file_in = $fopen("../../models/test_input_hex.txt", "r");
+        if (file_in == 0) begin
+            $display("ERROR: Could not open test_input_hex.txt");
+            $display("Run: python python/convert_test_vectors.py");
+            $finish;
+        end
+        
+        for (i = 0; i < NUM_TEST_VECTORS; i = i + 1) begin
+            for (j = 0; j < NUM_FEATURES; j = j + 1) begin
+                scan_result = $fscanf(file_in, "%h\n", temp_byte);
+                test_inputs[i][j] = temp_byte;
+            end
+        end
+        $fclose(file_in);
+        $display("Loaded %0d test input vectors", NUM_TEST_VECTORS);
+        
+        // Load expected outputs (0 or 1)
+        file_out = $fopen("../../models/test_output_ref.txt", "r");
+        if (file_out == 0) begin
+            $display("ERROR: Could not open test_output_ref.txt");
+            $display("Run: python python/convert_test_vectors.py");
+            $finish;
+        end
+        
+        for (i = 0; i < NUM_TEST_VECTORS; i = i + 1) begin
+            scan_result = $fscanf(file_out, "%d\n", temp_pred);
+            expected_outputs[i] = temp_pred;
+        end
+        $fclose(file_out);
+        $display("Loaded %0d expected outputs", NUM_TEST_VECTORS);
+    end
+    
+    //=========================================================================
+    // Test Procedure
+    //=========================================================================
+    
+    integer test_idx;
+    integer cycle_count;
+    
     initial begin
         // Initialize
         rst_n = 0;
         features_valid = 0;
-        
-        // Initialize feature data
-        for (integer i = 0; i < NUM_FEATURES; i++) begin
-            features[i] = 8'd0;
-        end
+        num_correct = 0;
+        num_total = 0;
         
         // Apply reset
-        #(CLOCK_PERIOD*10);
+        repeat(5) @(posedge clk);
         rst_n = 1;
-        #(CLOCK_PERIOD*10);
+        repeat(2) @(posedge clk);
         
-        // Test Case 1: Features representing background noise
-        $display("Test Case 1: Background Noise Features");
-        for (integer i = 0; i < NUM_FEATURES; i++) begin
-            features[i] = 8'd20 + $urandom_range(0, 10);
-        end
+        $display("\n========================================");
+        $display("Starting Inference Engine Tests");
+        $display("========================================\n");
         
-        // Start inference
-        features_valid = 1;
-        #(CLOCK_PERIOD);
-        features_valid = 0;
-        
-        // Wait for inference to complete
-        @(posedge inference_done);
-        $display("Inference Result (should be 0): %b", result);
-        #(CLOCK_PERIOD*10);
-        
-        // Test Case 2: Features representing keyword
-        $display("Test Case 2: Keyword Features");
-        for (integer i = 0; i < NUM_FEATURES; i++) begin
-            // Pattern more typical of the keyword
-            if (i > 5 && i < 15) begin
-                features[i] = 8'd180 + $urandom_range(0, 20);
-            else
-                features[i] = 8'd40 + $urandom_range(0, 30);
+        // Run all test vectors
+        for (test_idx = 0; test_idx < NUM_TEST_VECTORS; test_idx = test_idx + 1) begin
+            
+            // Load features
+            for (j = 0; j < NUM_FEATURES; j = j + 1) begin
+                features[j] = test_inputs[test_idx][j];
             end
+            
+            // Start inference
+            @(posedge clk);
+            features_valid = 1;
+            @(posedge clk);
+            features_valid = 0;
+            
+            // Wait for completion (timeout after 20,000 cycles)
+            cycle_count = 0;
+            while (!inference_done && cycle_count < 20000) begin
+                @(posedge clk);
+                cycle_count = cycle_count + 1;
+            end
+            
+            if (cycle_count >= 20000) begin
+                $display("ERROR: Test %0d timed out!", test_idx);
+                $finish;
+            end
+            
+            // Check result
+            num_total = num_total + 1;
+            if (prediction == expected_outputs[test_idx]) begin
+                num_correct = num_correct + 1;
+                if (test_idx < 10 || (test_idx % 10 == 0)) begin
+                    $display("Test %3d: PASS | Pred=%0d, Expected=%0d | Logits=[%0d, %0d] | Cycles=%0d", 
+                             test_idx, prediction, expected_outputs[test_idx], 
+                             $signed(logits[0]), $signed(logits[1]), cycle_count);
+                end
+            end else begin
+                $display("Test %3d: FAIL | Pred=%0d, Expected=%0d | Logits=[%0d, %0d] | Cycles=%0d", 
+                         test_idx, prediction, expected_outputs[test_idx],
+                         $signed(logits[0]), $signed(logits[1]), cycle_count);
+            end
+            
+            // Small delay between tests
+            repeat(5) @(posedge clk);
         end
         
-        // Start inference
-        features_valid = 1;
-        #(CLOCK_PERIOD);
-        features_valid = 0;
+        // Print summary
+        $display("\n========================================");
+        $display("Test Summary");
+        $display("========================================");
+        $display("Total Tests:    %0d", num_total);
+        $display("Passed:         %0d", num_correct);
+        $display("Failed:         %0d", num_total - num_correct);
+        $display("Accuracy:       %0.2f%%", (100.0 * num_correct) / num_total);
+        $display("========================================\n");
         
-        // Wait for inference to complete
-        @(posedge inference_done);
-        $display("Inference Result (should be 1): %b", result);
-        #(CLOCK_PERIOD*10);
+        if (num_correct == num_total) begin
+            $display("✅ ALL TESTS PASSED!\n");
+        end else begin
+            $display("❌ SOME TESTS FAILED\n");
+        end
         
-        // End simulation
         $finish;
     end
     
-    // Monitor inference progress
-    always @(posedge clk) begin
-        if (inference_done) begin
-            $display("Inference complete at %t ns with result: %b", $time, result);
-        end
+    //=========================================================================
+    // Waveform Dump (for debugging)
+    //=========================================================================
+    
+    initial begin
+        $dumpfile("inference_tb.vcd");
+        $dumpvars(0, tb_inference);
+    end
+    
+    //=========================================================================
+    // Timeout Watchdog
+    //=========================================================================
+    
+    initial begin
+        #(CLK_PERIOD * 2500000);  // 25ms timeout
+        $display("\nERROR: Global timeout!");
+        $finish;
     end
 
 endmodule

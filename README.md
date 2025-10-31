@@ -30,7 +30,17 @@ fpga-kws/
 │   ├── quantize_model.py      # Model quantization
 │   └── generate_mem.py        # Memory file generation
 └── docs/                      # Documentation
+    ├── architecture.md        # System architecture overview
+    ├── notes.md               # Development notes
+    └── metrics.md             # Performance metrics
 ```
+
+## Documentation
+
+- **[INFERENCE.md](fpga/INFERENCE.md)** - Complete guide to the neural network inference module (architecture, testing, debugging)
+- **[TODO.md](fpga/rtl/TODO.md)** - FPGA system architecture and module implementation guide
+- **[architecture.md](docs/architecture.md)** - High-level system overview
+- **[metrics.md](docs/metrics.md)** - Performance benchmarks
 
 ## Getting Started
 
