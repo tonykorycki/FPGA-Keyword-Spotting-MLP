@@ -90,7 +90,7 @@ def main():
     model_dir = "models"
     data_dir = "data/processed"
 
-    print("🔍 Loading models and data...")
+    print("Loading models and data...")
     float_model = keras.models.load_model(os.path.join(model_dir, "kws_model.h5"))
     weights_q, scales = load_quantized(model_dir)
 
@@ -121,7 +121,7 @@ def main():
     print(f"Float prediction = {float_pred}, Quantized = {quant_pred}")
 
     # --- Layer comparison ---
-    print("\n🔧 Layer output comparison:")
+    print("\nLayer output comparison:")
     print(f"{'Layer':<20} {'Type':<12} {'MAE':<12} {'Max Diff':<12}")
     print("-" * 60)
     
@@ -179,7 +179,7 @@ def main():
     
     plt.tight_layout()
     plt.savefig(os.path.join(model_dir, "layer_comparison.png"), dpi=150)
-    print(f"\n📊 Saved comparison plot to {model_dir}/layer_comparison.png")
+    print(f"\nSaved comparison plot to {model_dir}/layer_comparison.png")
     plt.show()
 
 

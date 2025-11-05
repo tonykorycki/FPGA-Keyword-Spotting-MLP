@@ -81,7 +81,7 @@ def visualize_spectrograms(label_map, input_dir):
         folder = os.path.join(input_dir, label_name)
         wav_files = glob.glob(os.path.join(folder, "*.wav"))
         if not wav_files:
-            print(f"⚠️ Skipping '{label_name}' (no .wav files found)")
+            print(f"Skipping '{label_name}' (no .wav files found)")
             continue
 
         # --- 1️⃣ Single-sample spectrogram (time vs freq) ---
@@ -134,7 +134,7 @@ def main():
     
     # Binary labeling: "start" = 1, everything else = 0
     label_map = {name: 1 if name == "start" else 0 for name in label_names}
-    print(f"📂 Found label folders with binary mapping: {label_map}")
+    print(f"Found label folders with binary mapping: {label_map}")
 
     all_features, all_labels = [], []
     all_actual_labels = [] 
@@ -145,10 +145,10 @@ def main():
         folder = os.path.join(args.input_dir, label_name)
         wav_files = glob.glob(os.path.join(folder, "*.wav"))
         if not wav_files:
-            print(f"⚠️ No files found in {folder}")
+            print(f"No files found in {folder}")
             continue
 
-        print(f"🎧 Processing {len(wav_files)} files for label '{label_name}' ({label_value})")
+        print(f"Processing {len(wav_files)} files for label '{label_name}' ({label_value})")
         all_class_spectra = []
 
         for i, wav_path in enumerate(tqdm(wav_files, desc=f"Extracting {label_name}")):
@@ -183,7 +183,7 @@ def main():
     np.save(os.path.join(args.output_dir, "filenames.npy"), np.array(filenames))
 
 
-    print("\n✅ Extraction complete!")
+    print("\nExtraction complete!")
     print(f"Feature shape: {features.shape}, Labels shape: {labels.shape}")
     print(f"Also saved labels_actual ({labels_actual.shape}) and label_types ({label_types.shape})")
     print(f"Binary label mapping: {label_map} (start=1, others=0)")

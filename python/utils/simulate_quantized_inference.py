@@ -95,15 +95,9 @@ def main():
     weights, scales = load_quantized_model(model_dir)
     X, y, filenames = load_dataset(data_dir)
 
-    print(f"🔧 Loaded quantized model from {model_dir}")
-    print(f"📦 Dataset: {X.shape[0]} samples, {X.shape[1]} features")
-    print(f"🔢 Model has {len(scales['layers'])} layers")
-    
-    # Debug: print weight shapes
-    for i in range(len(scales['layers'])):
-        w_shape = weights[f"layer{i}_weights"].shape
-        b_shape = weights[f"layer{i}_bias"].shape
-        print(f"  Layer {i}: weights {w_shape}, bias {b_shape}")
+    print(f"Loaded quantized model from {model_dir}")
+    print(f"Dataset: {X.shape[0]} samples, {X.shape[1]} features")
+    print(f"Model has {len(scales['layers'])} layers")
 
     preds = []
     logits = []
@@ -113,28 +107,54 @@ def main():
         logits.append(logit)
         
         if i % 1000 == 0:
-            print(f"  Processed {i}/{len(X)} samples...")
+            print(f"Processed {i}/{len(X)} samples...")
 
     preds = np.array(preds)
     logits = np.array(logits)
     acc = np.mean(preds == y)
-    print(f"\n✅ Quantized fixed-point accuracy: {acc * 100:.2f}%")
+    print(f"\nQuantized accuracy: {acc * 100:.2f}%")
 
     # Misclassified samples
     mis_idx = np.where(preds != y)[0]
-    print(f"❌ Misclassified: {len(mis_idx)} / {len(y)}")
-    for i in mis_idx[:10]:  # show up to 10
-        print(f"  {filenames[i]} → true: {y[i]}, pred: {preds[i]}")
+    print(f"Misclassified: {len(mis_idx)} / {len(y)}")
+    if len(mis_idx) > 0:
+        print("First 10 misclassifications:")
+        for i in mis_idx[:10]:
+            print(f"  {filenames[i]} -> true: {y[i]}, pred: {preds[i]}")
 
-    # Save reference predictions for FPGA testbench comparison
-    test_samples = min(100, len(X))
-    np.save(os.path.join(model_dir, "test_input.npy"), X[:test_samples])
-    np.save(os.path.join(model_dir, "test_output.npy"), preds[:test_samples])
-    np.save(os.path.join(model_dir, "test_logits.npy"), logits[:test_samples])
-    print(f"\n💾 Saved {test_samples} golden test vectors to:")
-    print(f"  {model_dir}/test_input.npy")
-    print(f"  {model_dir}/test_output.npy")
-    print(f"  {model_dir}/test_logits.npy")
+    # Save misclassified list
+    with open(os.path.join(model_dir, "misclassified.txt"), "w") as f:
+        for i in mis_idx:
+            f.write(f"{filenames[i]}\ttrue:{y[i]}\tpred:{preds[i]}\n")
+    
+    # Validate against golden test vectors (from float model)
+    test_input_path = os.path.join(model_dir, "test_input.npy")
+    test_output_path = os.path.join(model_dir, "test_output.npy")
+    
+    if os.path.exists(test_input_path) and os.path.exists(test_output_path):
+        print(f"\nValidating against golden test vectors...")
+        X_test = np.load(test_input_path)
+        y_golden = np.load(test_output_path)  # Float model predictions
+        
+        test_preds = []
+        test_logits = []
+        for x in X_test:
+            pred, logit = int_inference(x, weights, scales)
+            test_preds.append(pred)
+            test_logits.append(logit)
+        
+        test_preds = np.array(test_preds)
+        test_logits = np.array(test_logits)
+        
+        # Compare quantized vs float predictions
+        matches = np.sum(test_preds == y_golden)
+        print(f"Test vector agreement: {matches}/{len(y_golden)} ({matches/len(y_golden)*100:.1f}%)")
+        
+        # Save test logits for debugging
+        np.save(os.path.join(model_dir, "test_logits.npy"), test_logits)
+        print(f"Saved test logits to {model_dir}/test_logits.npy")
+    else:
+        print(f"\nNo golden test vectors found. Run train_model.py first to generate them.")
 
 
 if __name__ == "__main__":

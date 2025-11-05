@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="tb_inference_behav.wdb" id="1">
+         <top_modules>
+            <top_module name="glbl" />
+            <top_module name="tb_inference" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="0.000000000 ms"></ZoomStartTime>
+      <ZoomEndTime time="9.084065000 ms"></ZoomEndTime>
+      <Cursor1Time time="5.225165000 ms"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="404"></NameColumnWidth>
+      <ValueColumnWidth column_width="190"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="31" />
+   <wvobject fp_name="/tb_inference/clk" type="logic">
+      <obj_property name="ElementShortName">clk</obj_property>
+      <obj_property name="ObjectShortName">clk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/rst_n" type="logic">
+      <obj_property name="ElementShortName">rst_n</obj_property>
+      <obj_property name="ObjectShortName">rst_n</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/features_array" type="array">
+      <obj_property name="ElementShortName">features_array[0:256][7:0]</obj_property>
+      <obj_property name="ObjectShortName">features_array[0:256][7:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/features_packed" type="array">
+      <obj_property name="ElementShortName">features_packed[2055:0]</obj_property>
+      <obj_property name="ObjectShortName">features_packed[2055:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/features_valid" type="logic">
+      <obj_property name="ElementShortName">features_valid</obj_property>
+      <obj_property name="ObjectShortName">features_valid</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/inference_done" type="logic">
+      <obj_property name="ElementShortName">inference_done</obj_property>
+      <obj_property name="ObjectShortName">inference_done</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/prediction" type="logic">
+      <obj_property name="ElementShortName">prediction</obj_property>
+      <obj_property name="ObjectShortName">prediction</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/logits_packed" type="array">
+      <obj_property name="ElementShortName">logits_packed[63:0]</obj_property>
+      <obj_property name="ObjectShortName">logits_packed[63:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/logit0" type="array">
+      <obj_property name="ElementShortName">logit0[31:0]</obj_property>
+      <obj_property name="ObjectShortName">logit0[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/logit1" type="array">
+      <obj_property name="ElementShortName">logit1[31:0]</obj_property>
+      <obj_property name="ObjectShortName">logit1[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/pack_idx" type="array">
+      <obj_property name="ElementShortName">pack_idx[31:0]</obj_property>
+      <obj_property name="ObjectShortName">pack_idx[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/expected_outputs" type="array">
+      <obj_property name="ElementShortName">expected_outputs[0:99]</obj_property>
+      <obj_property name="ObjectShortName">expected_outputs[0:99]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/num_correct" type="array">
+      <obj_property name="ElementShortName">num_correct[31:0]</obj_property>
+      <obj_property name="ObjectShortName">num_correct[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/num_total" type="array">
+      <obj_property name="ElementShortName">num_total[31:0]</obj_property>
+      <obj_property name="ObjectShortName">num_total[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/i" type="array">
+      <obj_property name="ElementShortName">i[31:0]</obj_property>
+      <obj_property name="ObjectShortName">i[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/j" type="array">
+      <obj_property name="ElementShortName">j[31:0]</obj_property>
+      <obj_property name="ObjectShortName">j[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/file_in" type="array">
+      <obj_property name="ElementShortName">file_in[31:0]</obj_property>
+      <obj_property name="ObjectShortName">file_in[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/file_out" type="array">
+      <obj_property name="ElementShortName">file_out[31:0]</obj_property>
+      <obj_property name="ObjectShortName">file_out[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/scan_result" type="array">
+      <obj_property name="ElementShortName">scan_result[31:0]</obj_property>
+      <obj_property name="ObjectShortName">scan_result[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/temp_byte" type="array">
+      <obj_property name="ElementShortName">temp_byte[7:0]</obj_property>
+      <obj_property name="ObjectShortName">temp_byte[7:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/temp_pred" type="logic">
+      <obj_property name="ElementShortName">temp_pred</obj_property>
+      <obj_property name="ObjectShortName">temp_pred</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/test_idx" type="array">
+      <obj_property name="ElementShortName">test_idx[31:0]</obj_property>
+      <obj_property name="ObjectShortName">test_idx[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/cycle_count" type="array">
+      <obj_property name="ElementShortName">cycle_count[31:0]</obj_property>
+      <obj_property name="ObjectShortName">cycle_count[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/CLK_PERIOD" type="array">
+      <obj_property name="ElementShortName">CLK_PERIOD[31:0]</obj_property>
+      <obj_property name="ObjectShortName">CLK_PERIOD[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/NUM_TEST_VECTORS" type="array">
+      <obj_property name="ElementShortName">NUM_TEST_VECTORS[31:0]</obj_property>
+      <obj_property name="ObjectShortName">NUM_TEST_VECTORS[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/NUM_FEATURES" type="array">
+      <obj_property name="ElementShortName">NUM_FEATURES[31:0]</obj_property>
+      <obj_property name="ObjectShortName">NUM_FEATURES[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/dut/mac_accumulator" type="array">
+      <obj_property name="ElementShortName">mac_accumulator[31:0]</obj_property>
+      <obj_property name="ObjectShortName">mac_accumulator[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/dut/state" type="array">
+      <obj_property name="ElementShortName">state[3:0]</obj_property>
+      <obj_property name="ObjectShortName">state[3:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/dut/input_idx" type="array">
+      <obj_property name="ElementShortName">input_idx[8:0]</obj_property>
+      <obj_property name="ObjectShortName">input_idx[8:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/dut/weight_addr" type="array">
+      <obj_property name="ElementShortName">weight_addr[13:0]</obj_property>
+      <obj_property name="ObjectShortName">weight_addr[13:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_inference/dut/output_idx" type="array">
+      <obj_property name="ElementShortName">output_idx[5:0]</obj_property>
+      <obj_property name="ObjectShortName">output_idx[5:0]</obj_property>
+   </wvobject>
+</wave_config>

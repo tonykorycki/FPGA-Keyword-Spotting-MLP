@@ -73,7 +73,7 @@ def main():
     args = parse_args()
     ensure_dir(args.output_dir)
 
-    # 1️⃣ Load data
+    # 1. Load data
     X = np.load(os.path.join(args.features_dir, "features.npy"))
     y = np.load(os.path.join(args.features_dir, "labels.npy"))
 
@@ -87,18 +87,16 @@ def main():
     if os.path.exists(labels_actual_path) and os.path.exists(label_types_path):
         y_actual = np.load(labels_actual_path)
         label_types = np.load(label_types_path)
-        print(f"Loaded actual labels from folders: {label_types}")
     else:
         y_actual = y.copy()
         label_types = np.array([f"class {i}" for i in range(len(np.unique(y)))])
-        print("⚠️ No actual labels found. Using binary labels for visualization.")
 
-    print(f"Loaded features {X.shape}, labels {y.shape}")
+    print(f"Loaded features: {X.shape}, labels: {y.shape}")
     X = X / np.max(X)
     num_classes = len(np.unique(y))
     label_names = [f"class {i}" for i in range(num_classes)]
 
-    # 2️⃣ Split
+    # 2. Split
     X_train, X_test, y_train, y_test, filenames_train, filenames_test = train_test_split(
         X, y, filenames, test_size=0.2, stratify=y, random_state=42)
 
@@ -106,7 +104,7 @@ def main():
         y_actual, test_size=0.2, stratify=y, random_state=42
     )
 
-    # 3️⃣ Build and train
+    # 3. Build and train
     model = build_model(X_train.shape[1:], num_classes,
                         hidden_size=args.hidden_size,
                         l2_reg=args.l2, dropout_rate=args.dropout)
@@ -124,9 +122,9 @@ def main():
                         callbacks=callbacks,
                         verbose="1")
 
-    # 4️⃣ Evaluate
+    # 4. Evaluate
     test_loss, test_acc = model.evaluate(X_test, y_test, verbose=0)
-    print(f"\n✅ Test Accuracy: {test_acc:.4f}")
+    print(f"\nTest Accuracy: {test_acc:.4f}")
 
     y_pred = np.argmax(model.predict(X_test), axis=-1)
     print("\nClassification Report:")
@@ -134,22 +132,32 @@ def main():
     plot_history(history)
     plot_confusion_rect(y_actual_test, y_pred, label_types, label_names)
 
-    # 6️⃣ Misclassified samples
+    # 5. Misclassified samples
     misclassified_idx = np.where(y_pred != y_test)[0]
-    print(f"\n❌ Misclassified samples: {len(misclassified_idx)} / {len(y_test)}")
-    for i in misclassified_idx:
-        print(f"{filenames_test[i]} → true: {y_test[i]}, pred: {y_pred[i]}")
+    print(f"\nMisclassified: {len(misclassified_idx)} / {len(y_test)}")
+    if len(misclassified_idx) > 0:
+        print("First 10 misclassifications:")
+        for i in misclassified_idx[:10]:
+            print(f"  {filenames_test[i]} -> true: {y_test[i]}, pred: {y_pred[i]}")
 
-    # Optionally save to text file
     with open(os.path.join(args.output_dir, "misclassified.txt"), "w") as f:
         for i in misclassified_idx:
             f.write(f"{filenames_test[i]}\ttrue:{y_test[i]}\tpred:{y_pred[i]}\n")
 
-
-    # 5️⃣ Save model
+    # 6. Save model
     model_file = os.path.join(args.output_dir, "kws_model.h5")
     model.save(model_file)
-    print(f"✅ Model saved to {model_file}")
+    print(f"\nModel saved to {model_file}")
+    
+    # 7. Create golden test vectors for FPGA validation
+    # Save a subset of test data with float model predictions
+    num_test_vectors = min(100, len(X_test))
+    test_input = X_test[:num_test_vectors]
+    test_output = y_pred[:num_test_vectors]  # Float model predictions (not ground truth)
+    
+    np.save(os.path.join(args.output_dir, "test_input.npy"), test_input)
+    np.save(os.path.join(args.output_dir, "test_output.npy"), test_output)
+    print(f"Saved {num_test_vectors} golden test vectors (float model predictions)")
 
 
 if __name__ == "__main__":

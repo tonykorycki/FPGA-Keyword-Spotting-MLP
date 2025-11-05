@@ -233,7 +233,7 @@ module inference #(
                     mac_weight <= $signed(layer0_weights[weight_addr]);
                     mac_activation <= input_buffer[input_idx];
                     
-                    // Accumulate (skip first cycle - product not ready yet)
+                    // Accumulate 
                     if (!first_mac) begin
                         mac_accumulator <= mac_accumulator + $signed(mac_product);
                     end else begin
