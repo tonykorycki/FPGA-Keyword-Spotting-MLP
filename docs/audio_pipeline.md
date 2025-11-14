@@ -1,23 +1,12 @@
-# FPGA Keyword Spotting System - Architecture & Implementation Guide
+# Audio Pipeline Specification
 
-## System Overview
+Implementation guide for audio preprocessing modules.
 
-This FPGA implementation performs real-time keyword spotting using a 3-layer neural network trained on audio features. The system processes audio from an I2S microphone, extracts frequency-domain features via FFT, and classifies the audio as "keyword" or "non-keyword" using quantized int8 inference.
+## Module Overview
 
-### Data Flow Pipeline
+The audio pipeline converts raw I2S microphone data into 257 INT8 features for the neural network.
 
-```
-Microphone → I2S RX → Frame Buffer → FFT → Feature Extraction → Neural Network → Output Control
-   (analog)   (16-bit)   (256 samples)  (spectrum)  (257 int8)      (prediction)     (LEDs)
-```
-
-### Timing Budget (@ 100 MHz system clock)
-- Audio sampling: 48 kHz (20.8 µs/sample)
-- Frame generation: 256 samples @ 50% overlap = 2.67 ms/frame
-- FFT computation: ~512 cycles = 5.12 µs
-- Feature extraction: ~300 cycles = 3 µs
-- Neural network inference: ~8,768 cycles = 87.68 µs
-- **Total latency**: ~5.5 ms from audio to prediction
+**Pipeline**: I2S RX -> Frame Buffer -> FFT -> Feature Extraction -> (257 features)
 
 ---
 

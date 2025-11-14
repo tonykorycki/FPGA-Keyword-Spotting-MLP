@@ -2,59 +2,50 @@
 
 ## System Architecture
 
-The FPGA-based Keyword Spotting (KWS) system implements a complete audio processing pipeline on FPGA hardware. The system is designed modularly with distinct stages:
+The FPGA-based Keyword Spotting (KWS) system implements a complete audio processing pipeline on FPGA hardware.
 
-```
-Audio Input (I2S) → Frame Buffer → FFT → Feature Extraction → Inference → Output
-```
+**Pipeline**: Audio Input (I2S) → Frame Buffer → FFT → Feature Extraction → Inference → Output
 
-### Current Implementation Status
+### Current Status
 
-✅ **Completed:**
+**Completed:**
 - Neural network inference engine (Verilog)
 - Python training and quantization pipeline
 - INT8 quantized 3-layer MLP model
 - Test vector generation and verification
 
-🚧 **In Progress:**
+**In Progress:**
 - Audio preprocessing modules (I2S, FFT, feature extraction)
 - System integration
 - Hardware testing on Basys 3
 
 ## Audio Processing Pipeline (Planned)
 
-1. **Audio Acquisition** (TODO: `i2s_rx.v`)
+1. **Audio Acquisition** (i2s_rx.v - TODO)
    - I2S MEMS microphone interface
    - 16 kHz sample rate, 16-bit samples
-   - Real-time audio capture
    
-2. **Frame Buffering** (TODO: `frame_buffer.v`)
+2. **Frame Buffering** (frame_buffer.v - TODO)
    - Windowing into 32ms frames (512 samples @ 16kHz)
    - 50% overlap between consecutive frames
-   - Hamming window to reduce spectral leakage
    
-3. **Spectral Analysis** (TODO: `fft_core.v`)
-   - 512-point FFT computed on each frame
+3. **Spectral Analysis** (fft_core.v - TODO)
+   - 512-point FFT
    - Complex → magnitude conversion
-   - Power spectrum calculation
    
-4. **Feature Extraction** (TODO: `feature_extractor.v`)
-   - Mel filterbank applied to FFT output
+4. **Feature Extraction** (feature_extractor.v - TODO)
    - Log-mel spectrogram computation
    - 257 feature coefficients extracted
    - INT8 quantization for inference
    
-5. **Neural Network Inference** (COMPLETE: `inference.v`)
+5. **Neural Network Inference** (inference.v - COMPLETE)
    - 3-layer MLP: 257 → 32 → 16 → 2
    - INT8 weights, INT32 biases
-   - INT32 accumulator with requantization
    - ReLU activation on hidden layers
-   - Argmax for binary classification
    
-6. **Output Control** (TODO: `output_control.v`)
-   - LED visualization of detection
+6. **Output Control** (output_control.v - TODO)
+   - LED visualization
    - Detection flag output
-   - Configurable detection threshold
 
 ## Neural Network Architecture
 
@@ -170,17 +161,17 @@ Estimated resource usage with audio pipeline:
 
 ### Inference Engine (`inference.v`)
 
-**Status:** ✅ Complete
+**Status:** Complete
 
 ```verilog
 module inference (
-    input  wire        clk,                    // 100 MHz system clock
-    input  wire        rst_n,                  // Active-low reset
-    input  wire [7:0]  features [0:256],       // 257 INT8 features
-    input  wire        features_valid,         // Start inference
-    output reg         inference_done,         // Inference complete (1 cycle pulse)
-    output reg         prediction,             // Binary result (0 or 1)
-    output reg  [31:0] logits [0:1]            // Raw scores for debug
+    input  wire        clk,
+    input  wire        rst_n,
+    input  wire [7:0]  features [0:256],
+    input  wire        features_valid,
+    output reg         inference_done,
+    output reg         prediction,
+    output reg  [31:0] logits [0:1]
 );
 ```
 

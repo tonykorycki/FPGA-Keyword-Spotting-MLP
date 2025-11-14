@@ -6,7 +6,7 @@ The inference module implements a 3-layer quantized neural network for keyword s
 
 **Architecture**: 257 → 32 → 16 → 2 (input → hidden → hidden → output)
 
-**Accuracy**: 99% (matches Python quantized model at 97.5%)
+**Accuracy**: 99% (matches Python quantized model)
 
 ---
 
@@ -163,33 +163,18 @@ vvp inference_sim.vvp
 ### 3. Expected Output
 
 ```
-=========================================
-Inference Module Simulation
-=========================================
-
-✅ Test vectors found
-✅ Compilation successful
-
-========================================
-Starting Inference Engine Tests
-========================================
-
 Test   0: PASS | Pred=0, Expected=0 | Logits=[127, -109] | Cycles=9077
 Test   1: PASS | Pred=0, Expected=0 | Logits=[127, -107] | Cycles=9077
 ...
 Test  99: PASS | Pred=1, Expected=1 | Logits=[-127, 127] | Cycles=9077
 
-========================================
-Test Summary
-========================================
 Total Tests:    100
 Passed:         99
 Failed:         1
 Accuracy:       99.00%
-========================================
 ```
 
-**Note**: 99% accuracy is expected due to minor rounding differences from Python. One test (typically #55) has a tie `[29, 29]` that rounds differently.
+**Note**: 99% accuracy is expected due to minor rounding differences from Python.
 
 ### 4. View Waveforms
 
@@ -259,18 +244,13 @@ parameter LAYER0_WEIGHTS_FILE = "../../models/mem/layer0_weights.mem";
 
 ## Next Steps
 
-1. **Synthesize for FPGA**: Run Vivado synthesis targeting Basys 3 (xc7a35tcpg236-1)
+1. **Synthesize for FPGA**: Run Vivado synthesis targeting Basys 3
 2. **Timing closure**: Verify meets 100 MHz timing
-3. **Integration**: Connect to feature extraction pipeline:
-   - `feature_extractor.v` → FFT → magnitude → quantization
-   - `i2s_rx.v` → audio input from microphone
-   - `frame_buffer.v` → 256-sample windowing
+3. **Integration**: Connect to feature extraction pipeline
 4. **Top-level**: Combine all modules in `top.v`
-
----
 
 ## Reference Documents
 
-- **`fpga/rtl/TODO.md`** - Complete FPGA system architecture guide
+- **`docs/audio_pipeline.md`** - Audio preprocessing module specifications
 - **`python/quantize_model.py`** - Weight quantization details
-- **`docs/architecture.md`** - High-level system overview
+- **`docs/architecture.md`** - System design overview

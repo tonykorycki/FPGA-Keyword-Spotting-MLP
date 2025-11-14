@@ -17,7 +17,7 @@
 
 ## Current Implementation Status
 
-### ✅ Completed Modules
+### Completed Modules
 
 **Inference Engine (`inference.v`):**
 - 3-layer MLP: 257→32→16→2
@@ -26,7 +26,7 @@
 - Requantization with Q16.16 scale factors
 - ReLU activation
 - Argmax classification
-- **Status:** Tested, synthesized, verified
+- Status: Tested, synthesized, verified
 
 **Python Pipeline:**
 - Audio data collection and preprocessing
@@ -35,9 +35,9 @@
 - INT8 quantization with scale factor computation
 - Memory file generation (.mem format)
 - Test vector generation and validation
-- **Status:** Complete and documented
+- Status: Complete
 
-### 🚧 In Progress / TODO
+### In Progress / TODO
 
 **Audio Preprocessing Pipeline:**
 - `i2s_rx.v` - I2S microphone interface
@@ -47,7 +47,7 @@
 - `top.v` - System integration
 - `output_control.v` - LED/output control
 
-See [fpga/rtl/TODO.md](../fpga/rtl/TODO.md) for detailed specs.
+See [audio_pipeline.md](audio_pipeline.md) for detailed specs.
 
 ## Fixed-Point Representation
 
@@ -101,10 +101,10 @@ Layer 2: 0.004304 → 282 (Q16.16)
 ### Unit Tests
 
 **Inference Engine:**
-- ✅ 800 test vectors from Python quantized model
-- ✅ Icarus Verilog simulation: 99.625% accuracy (797/800)
-- ✅ Compare against Python golden reference
-- ✅ Edge case testing (min/max values, overflow)
+- 800 test vectors from Python quantized model
+- Icarus Verilog simulation: 99.625% accuracy (797/800)
+- Compare against Python golden reference
+- Edge case testing (min/max values, overflow)
 
 **Future Module Tests:**
 - I2S receiver: Test with synthetic bit patterns
@@ -193,10 +193,10 @@ Layer 2: 0.004304 → 282 (Q16.16)
 ## File Organization Best Practices
 
 ### Version Control
-- ✅ Track source RTL, testbenches, Python scripts
-- ✅ Ignore Vivado build artifacts (`.runs/`, `.sim/`, `.cache/`)
-- ✅ Keep one copy of weights (in `models/mem/`)
-- ✅ Use descriptive commit messages
+- Track source RTL, testbenches, Python scripts
+- Ignore Vivado build artifacts (`.runs/`, `.sim/`, `.cache/`)
+- Keep one copy of weights (in `models/mem/`)
+- Use descriptive commit messages
 
 ### Documentation
 - Keep `project_status.md` updated with milestones

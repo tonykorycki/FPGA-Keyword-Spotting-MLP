@@ -213,9 +213,9 @@ module tb_inference;
         $display("========================================\n");
         
         if (num_correct == num_total) begin
-            $display("✅ ALL TESTS PASSED!\n");
+            $display("ALL TESTS PASSED!\n");
         end else begin
-            $display("❌ SOME TESTS FAILED\n");
+            $display("SOME TESTS FAILED\n");
         end
         
         $finish;

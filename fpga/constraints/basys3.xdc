@@ -50,12 +50,12 @@ set_property PACKAGE_PIN U17 [get_ports detected]
 set_property IOSTANDARD LVCMOS33 [get_ports detected]
 
 # Pmod header JA for I2S audio interface
-set_property PACKAGE_PIN J1 [get_ports i2s_sdin]					
-set_property IOSTANDARD LVCMOS33 [get_ports i2s_sdin]
-set_property PACKAGE_PIN L2 [get_ports i2s_sclk]					
-set_property IOSTANDARD LVCMOS33 [get_ports i2s_sclk]
-set_property PACKAGE_PIN J2 [get_ports i2s_lrclk]					
-set_property IOSTANDARD LVCMOS33 [get_ports i2s_lrclk]
+set_property PACKAGE_PIN J1 [get_ports sclk]					
+set_property IOSTANDARD LVCMOS33 [get_ports sclk]
+set_property PACKAGE_PIN L2 [get_ports lrclk]					
+set_property IOSTANDARD LVCMOS33 [get_ports lrclk]
+set_property PACKAGE_PIN J2 [get_ports sdin]					
+set_property IOSTANDARD LVCMOS33 [get_ports sdin]
 
 # Configuration options
 set_property CONFIG_VOLTAGE 3.3 [current_design]

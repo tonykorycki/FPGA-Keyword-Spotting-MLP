@@ -153,7 +153,7 @@ def main():
     # Save a subset of test data with float model predictions
     num_test_vectors = min(100, len(X_test))
     test_input = X_test[:num_test_vectors]
-    test_output = y_pred[:num_test_vectors]  # Float model predictions (not ground truth)
+    test_output = y_pred[:num_test_vectors]  # Float model predictions
     
     np.save(os.path.join(args.output_dir, "test_input.npy"), test_input)
     np.save(os.path.join(args.output_dir, "test_output.npy"), test_output)

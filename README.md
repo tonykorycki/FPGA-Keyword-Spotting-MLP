@@ -1,25 +1,22 @@
 # FPGA-based Keyword Spotting System
 
-Real-time keyword spotting system targeting Digilent Basys 3 FPGA. Combines a Python-trained quantized neural network with Verilog HDL hardware implementation for edge AI audio processing.
+Real-time keyword spotting system targeting Digilent Basys 3 FPGA. Combines Python-trained quantized neural network with Verilog hardware implementation for edge AI audio processing.
 
 ## Project Status
 
-✅ **Completed:**
+**Completed:**
 - Python ML pipeline: data collection, feature extraction, model training
 - INT8 quantized 3-layer MLP (257→32→16→2) with 98% test accuracy
 - Verilog inference engine with 99% simulation accuracy (797/800 test cases)
 - Successful Vivado synthesis on Basys 3 (16.84% LUTs, 6.46% FFs)
 
-🚧 **In Progress:**
+**In Progress:**
 - Audio preprocessing pipeline (I2S receiver, FFT, feature extraction)
 - System integration and top-level module
 
 ## Overview
 
-The system detects the keyword "start" in real-time audio. The complete pipeline includes:
-1. **Python Training** - Audio processing, feature extraction, model training & quantization
-2. **FPGA Inference** - Hardware neural network running on quantized INT8 weights
-3. **Audio Pipeline** (planned) - I2S microphone input, FFT, mel-spectrogram features
+The system detects the keyword "start" in real-time audio using a hardware neural network running on INT8 quantized weights.
 
 ## Repository Structure
 
@@ -39,14 +36,13 @@ fpga-kws/
 │       └── ...
 ├── fpga/                       # FPGA design files
 │   ├── rtl/                    # Verilog source modules
-│   │   ├── inference.v         # ✅ Neural network inference engine (COMPLETE)
-│   │   ├── i2s_rx.v            # 🚧 I2S audio receiver (TODO)
-│   │   ├── frame_buffer.v      # 🚧 Audio windowing (TODO)
-│   │   ├── fft_core.v          # 🚧 512-point FFT (TODO)
-│   │   ├── feature_extractor.v # 🚧 Mel-spectrogram (TODO)
-│   │   ├── output_control.v    # 🚧 Output control (TODO)
-│   │   ├── top.v               # 🚧 System integration (TODO)
-│   │   └── TODO.md             # Module planning guide
+│   │   ├── inference.v         # Neural network inference engine (COMPLETE)
+│   │   ├── i2s_rx.v            # I2S audio receiver (TODO)
+│   │   ├── frame_buffer.v      # Audio windowing (TODO)
+│   │   ├── fft_core.v          # 512-point FFT (TODO)
+│   │   ├── feature_extractor.v # Mel-spectrogram (TODO)
+│   │   ├── output_control.v    # Output control (TODO)
+│   │   └── top.v               # System integration (TODO)
 │   ├── tb/                     # Testbenches
 │   │   ├── tb_inference.v      # Inference engine testbench
 │   │   ├── tb_i2s_rx.v
@@ -94,11 +90,11 @@ fpga-kws/
 
 ## Documentation
 
-- **[project_status.md](docs/project_status.md)** - 📍 **START HERE** - Current project status, completed milestones, next steps
-- **[INFERENCE.md](fpga/INFERENCE.md)** - Complete guide to the neural network inference module (architecture, testing, synthesis results)
-- **[TODO.md](fpga/rtl/TODO.md)** - FPGA module implementation roadmap (audio pipeline planning)
-- **[architecture.md](docs/architecture.md)** - High-level system design overview
-- **[metrics.md](docs/metrics.md)** - Performance benchmarks and accuracy metrics
+- **[project_status.md](docs/project_status.md)** - Current status and roadmap
+- **[INFERENCE.md](fpga/INFERENCE.md)** - Inference module guide (architecture, testing, synthesis)
+- **[audio_pipeline.md](docs/audio_pipeline.md)** - Audio preprocessing module specifications
+- **[architecture.md](docs/architecture.md)** - System design overview
+- **[metrics.md](docs/metrics.md)** - Performance benchmarks
 
 ## Quick Start
 
@@ -143,7 +139,7 @@ cd fpga/tb
 - Target: Basys 3 (xc7a35tcpg236-1)
 - LUT usage: 16.84% (3,502 / 20,800)
 - FF usage: 6.46% (2,686 / 41,600)
-- Status: ✅ Successful, excellent resource headroom
+- Status: Successful, excellent resource headroom
 
 ### 3. Next Steps: Audio Pipeline (TODO)
 
@@ -156,7 +152,7 @@ The audio preprocessing pipeline is planned but not yet implemented:
 4. `feature_extractor.v` - Log-mel spectrogram → 257 features
 5. `top.v` - System integration
 
-See [TODO.md](fpga/rtl/TODO.md) for detailed specifications.
+See [audio_pipeline.md](docs/audio_pipeline.md) for detailed specifications.
 
 ## Hardware Requirements
 
@@ -202,12 +198,12 @@ Install via: `pip install -r requirements.txt`
 
 ## Project Timeline
 
-- ✅ **Phase 1:** Python ML pipeline and model training
-- ✅ **Phase 2:** Quantization and memory file generation
-- ✅ **Phase 3:** Verilog inference engine and verification
-- ✅ **Phase 4:** Vivado synthesis and resource analysis
-- 🚧 **Phase 5:** Audio preprocessing pipeline (in planning)
-- 📋 **Phase 6:** System integration and hardware testing
+- Phase 1: Python ML pipeline and model training (COMPLETE)
+- Phase 2: Quantization and memory file generation (COMPLETE)
+- Phase 3: Verilog inference engine and verification (COMPLETE)
+- Phase 4: Vivado synthesis and resource analysis (COMPLETE)
+- Phase 5: Audio preprocessing pipeline (IN PROGRESS)
+- Phase 6: System integration and hardware testing (PLANNED)
 
 ## License
 

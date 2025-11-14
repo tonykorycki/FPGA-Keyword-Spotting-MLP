@@ -114,5 +114,12 @@ fft_sim
 # Project-specific
 *.raw
 *.wav
+*.csv
+*.png
 model_weights/
 dataset/
+
+# Audio capture files (from ILA/testing)
+audio_capture*.csv
+captured_audio*.wav
+samples.txt
