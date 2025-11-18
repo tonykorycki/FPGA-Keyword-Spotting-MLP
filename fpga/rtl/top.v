@@ -66,27 +66,70 @@ module top (
     
     // Feature Extractor (TODO)
     // Converts FFT spectrum to 257 INT8 features: magnitude -> log -> quantize
-    wire                features_valid;
-    wire signed [7:0]   features [0:256];
+    wire                frame_features_valid;
+    wire [4111:0]       frame_features;  // Raw per-frame features (257*16 = 4112 bits)
     
-    assign features_valid = 1'b0;
+    assign frame_features_valid = 1'b0;
+    assign frame_features = {4112{1'b0}};  // TODO: Connect to feature extractor
+    
+    // Feature Averager - 1s sliding window (matches training distribution)
+    wire [4111:0]       averaged_features_16bit;  // 257*16 = 4112 bits
+    wire                averaged_valid;
+    
+    feature_averager #(
+        .NUM_FEATURES(257),
+        .WINDOW_FRAMES(31),    // ~1 second @ 32ms/frame
+        .FEATURE_WIDTH(16),
+        .SUM_WIDTH(24)
+    ) averager (
+        .clk(clk),
+        .rst_n(rst_n),
+        .frame_features(frame_features),
+        .frame_valid(frame_features_valid),
+        .averaged_features(averaged_features_16bit),
+        .averaged_valid(averaged_valid)
+    );
+    
+    // Convert averaged features from int16 to int8 for inference
+    // Extract each 16-bit feature, saturate to int8, and pack into bit vector
+    wire [2055:0] features_packed;
+    genvar k;
+    generate
+        for (k = 0; k < 257; k = k + 1) begin : quantize_and_pack_features
+            wire signed [15:0] feature_16bit;
+            wire signed [7:0] feature_8bit;
+            
+            // Extract 16-bit feature from packed vector
+            assign feature_16bit = averaged_features_16bit[k*16 +: 16];
+            
+            // Saturate to int8 range [-128, 127]
+            assign feature_8bit = (feature_16bit > 127) ? 8'd127 :
+                                  (feature_16bit < -128) ? -8'd128 :
+                                  feature_16bit[7:0];
+            
+            // Pack into output vector
+            assign features_packed[k*8 +: 8] = feature_8bit;
+        end
+    endgenerate
     
     // Neural Network Inference (3-layer MLP: 257->32->16->2)
-    wire                inference_start;
     wire                inference_done;
     wire                prediction;
+    wire [63:0]         logits_packed;
     wire signed [31:0]  logits [0:1];
     
-    assign inference_start = sw[15]; //for testing rn start inference when switch 15 is high
+    // Unpack logits
+    assign logits[0] = logits_packed[31:0];
+    assign logits[1] = logits_packed[63:32];
     
     inference nn_engine (
         .clk(clk),
         .rst_n(rst_n),
-        .inference_start(inference_start),
-        .features(features),
+        .features(features_packed),
+        .features_valid(averaged_valid),  // Start inference when averaged features ready
         .inference_done(inference_done),
         .prediction(prediction),
-        .logits(logits)
+        .logits(logits_packed)
     );
     
     // Output Control
@@ -108,12 +151,12 @@ module top (
             led_reg[0]  <= sample_valid;
             led_reg[1]  <= frame_ready;
             led_reg[2]  <= fft_done;
-            led_reg[3]  <= features_valid;
-            led_reg[4]  <= inference_start;
+            led_reg[3]  <= frame_features_valid;  // Per-frame features
+            led_reg[4]  <= averaged_valid;        // 1s averaged features (triggers inference)
             led_reg[5]  <= inference_done;
-            led_reg[6]  <= prediction;
+            led_reg[7]  <= prediction;
             led_reg[15] <= led_detection;
-            led_reg[14:7] <= sw[14:7];
+            led_reg[14:8] <= sw[14:8];
             
             if (inference_done && prediction) begin
                 detection_timer <= HOLD_TIME; //turn on LED for 500ms
