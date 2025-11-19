@@ -1,4 +1,6 @@
+# =============================================================================
 # Python
+# =============================================================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -28,56 +30,93 @@ ENV/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# Vivado / FPGA - Build artifacts
-*.cache/
-*.hw/
-*.ip_user_files/
-*.sim/
+# =============================================================================
+# Vivado Project Files - Generated Content
+# =============================================================================
+
+# Project-level generated directories
+**/*.cache/
+**/*.hw/
+**/*.ip_user_files/
+**/*.sim/
+**/*.runs/
+**/*.gen/
+
+# IP Integrator
+**/*.ioplanning/
+
+# Temporary/cache directories
 .Xil/
 .hbs/
 xgui/
 xsim.dir/
 webtalk/
-webtalk.jou
-webtalk.log
 
-# Vivado - Run directories (synthesis/implementation outputs)
-**/*.runs/synth_*/
-**/*.runs/impl_*/
-**/*.runs/.jobs/
+# =============================================================================
+# Vivado IP Core Generated Files
+# =============================================================================
+# Exclude ALL generated HDL, simulation, and synthesis files from IP cores
+# These are auto-generated from .xci files and should NOT be committed
+**/*.srcs/sources_1/ip/*/hdl/
+**/*.srcs/sources_1/ip/*/sim/
+**/*.srcs/sources_1/ip/*/synth/
+**/*.srcs/sources_1/ip/*/*.vhd
+**/*.srcs/sources_1/ip/*/*.v
+**/*.srcs/sources_1/ip/*/*.veo
+**/*.srcs/sources_1/ip/*/*.vho
+**/*.srcs/sources_1/ip/*/component.xml
+**/*.srcs/sources_1/ip/*/*.xml
+**/*.srcs/sources_1/ip/*/*.log
+**/*.srcs/sources_1/ip/*/*.jou
 
-# Vivado - Source file copies (originals are in fpga/rtl/, fpga/tb/, models/mem/)
+# Keep ONLY the IP configuration files (.xci) - these define your IP instances
+!**/*.srcs/sources_1/ip/*/*.xci
+!**/*.srcs/sources_1/ip/*/*.xco
+
+# Also ignore IP files at top level gen directory
+**/*.gen/sources_1/ip/*/hdl/
+**/*.gen/sources_1/ip/*/sim/
+**/*.gen/sources_1/ip/*/synth/
+**/*.gen/sources_1/ip/*/*.vhd
+**/*.gen/sources_1/ip/*/*.v
+
+# =============================================================================
+# Vivado Imported Source Files
+# =============================================================================
+# Exclude imported copies (originals should be in fpga/rtl/, fpga/tb/, etc.)
 **/*.srcs/sources_1/imports/
 **/*.srcs/sim_1/imports/
+**/*.srcs/constrs_1/imports/
 
-# Vivado - Generated files
+# =============================================================================
+# Vivado Logs and Reports
+# =============================================================================
 *.jou
 *.log
 *.str
-*.backup.*
 *.debug
+*.wdf
+*.pb
+webtalk.jou
+webtalk.log
+vivado*.jou
+vivado*.log
+vivado*.pb
 xvlog.log
 xvlog.pb
 xsim*.jou
 xsim*.log
-vivado*.jou
-vivado*.log
-vivado*.pb
-*.wdf
-*.pb
-*.dcp
-*.vds
-ISEWrap.js
-ISEWrap.sh
-rundef.js
-runme.bat
-runme.sh
-gen_run.xml
-htr.txt
-__synthesis_is_running__
-__synthesis_is_complete__
 
-# Vivado - Output products (can be regenerated)
+# Reports (can be regenerated)
+*.rpt
+*.drc
+*.txt
+# Keep specific important reports if needed
+# !*utilization_synth.rpt
+
+# =============================================================================
+# Vivado Output Products
+# =============================================================================
 *.bit
 *.bin
 *.mcs
@@ -85,41 +124,93 @@ __synthesis_is_complete__
 *.ltx
 *.xsa
 *.tar.gz
+*.dcp
+*.vds
+*.backup.*
 
-# Vivado - Reports (keep synthesis utilization reports)
-*.rpt
-!*utilization_synth.rpt
+# Scripting wrappers
+ISEWrap.js
+ISEWrap.sh
+rundef.js
+runme.bat
+runme.sh
+gen_run.xml
 
-# Keep important Vivado project files
-!*.tcl
+# Status files
+htr.txt
+dfx_runtime.txt
+__synthesis_is_running__
+__synthesis_is_complete__
+
+# =============================================================================
+# Keep Important Source Files
+# =============================================================================
+# Explicitly keep project configuration and source files
 !*.xpr
 !*.xdc
 !*.v
 !*.vh
 !*.sv
+!*.vhd
+!*.tcl
+!*.wcfg
+!*.do
 
-# Icarus Verilog simulation
+# But exclude generated TCL scripts in runs
+*.runs/**/*.tcl
+
+# Keep simulation and constraint scripts
+!fpga/sim/*.tcl
+!fpga/constraints/*.tcl
+!fpga/tb/*.tcl
+
+# =============================================================================
+# Icarus Verilog / ModelSim Simulation
+# =============================================================================
 *.vvp
 *.vcd
+*.wlf
 inference_sim
 fft_sim
+feature_avg_sim
+transcript
 
+# =============================================================================
 # System / IDE
+# =============================================================================
 .DS_Store
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# Project-specific
+# =============================================================================
+# Project-Specific
+# =============================================================================
+# Test/development projects
+fpga/mictest/
+
+# Audio/data files (large binary files)
 *.raw
 *.wav
+# But keep example/small test files if needed
+# !data/test_sample.wav
+
+# Temporary data analysis files
 *.csv
 *.png
+# Keep documentation images
+!docs/**/*.png
+!docs/diagrams/*.png
+
+# Large datasets
 model_weights/
 dataset/
+data/raw/
 
-# Audio capture files (from ILA/testing)
+# Test output files
 audio_capture*.csv
 captured_audio*.wav
 samples.txt
+fpga_audio_*.txt

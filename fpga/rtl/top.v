@@ -12,10 +12,10 @@ module top (
     input  wire        clk,           // 100 MHz system clock
     input  wire        btnC,          // Center button reset
     
-    // I2S Microphone Interface (TODO)
-    input  wire        i2s_sclk,
-    input  wire        i2s_lrclk, //left right channel select
-    input  wire        i2s_sdin,
+    // I2S Microphone Interface (FPGA is master, generates clocks)
+    output wire        i2s_bclk,      // Bit clock to mic (~1 MHz)
+    output wire        i2s_lrclk,     // LR clock to mic (~16 kHz)
+    input  wire        i2s_dout,      // Data from mic
     
     // Status outputs
     output wire [15:0] led,
@@ -42,27 +42,48 @@ module top (
     
     assign rst_n = reset_sync[2];
     
-    // I2S Audio Receiver (TODO)
+    // I2S Audio Receiver
     wire [15:0] audio_sample;
     wire        sample_valid;
     
-    assign audio_sample = 16'h0000;
-    assign sample_valid = 1'b0;
+    i2s_rx i2s_receiver (
+        .clk(clk),
+        .rst_n(rst_n),
+        .i2s_bclk(i2s_bclk),
+        .i2s_lrclk(i2s_lrclk),
+        .i2s_dout(i2s_dout),
+        .audio_sample(audio_sample),
+        .sample_valid(sample_valid)
+    );
     
-    // Frame Buffer (TODO)
+    // Frame Buffer
     wire                frame_ready;
-    wire signed [15:0]  frame_data [0:511];
+    wire [8191:0]       frame_data_packed;  // 512 samples × 16 bits
     wire                frame_consumed;
     
-    assign frame_ready = 1'b0;
+    frame_buffer fb (
+        .clk(clk),
+        .rst_n(rst_n),
+        .audio_sample(audio_sample),
+        .sample_valid(sample_valid),
+        .frame_consumed(frame_consumed),
+        .frame_ready(frame_ready),
+        .frame_data_packed(frame_data_packed)
+    );
     
-    // FFT Core (TODO - Xilinx FFT IP)
-    wire                fft_start;
+    // FFT Core - Xilinx FFT IP Wrapper
     wire                fft_done;
-    wire signed [15:0]  fft_real [0:256];
-    wire signed [15:0]  fft_imag [0:256];
+    wire [8223:0]       fft_bins_packed;  // 257 bins × 32 bits (real+imag)
     
-    assign fft_done = 1'b0;
+    fft_core fft (
+        .clk(clk),
+        .rst_n(rst_n),
+        .frame_data_packed(frame_data_packed),
+        .frame_valid(frame_ready),
+        .frame_consumed(frame_consumed),
+        .fft_bins_packed(fft_bins_packed),
+        .fft_done(fft_done)
+    );
     
     // Feature Extractor (TODO)
     // Converts FFT spectrum to 257 INT8 features: magnitude -> log -> quantize
@@ -167,8 +188,8 @@ module top (
                 led_detection <= 1'b0;
             end
             
-            led_processing <= frame_ready | fft_done | features_valid;
-            led_inference  <= inference_start;
+            led_processing <= frame_ready | fft_done | frame_features_valid;
+            led_inference  <= averaged_valid;
         end
     end
     
