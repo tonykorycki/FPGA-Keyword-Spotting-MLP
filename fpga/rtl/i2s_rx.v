@@ -14,25 +14,9 @@ module i2s_rx (
     input wire i2s_dout,             // Data from mic
     
     // Output Interface
-    (* mark_debug = "true" *) output reg [15:0] audio_sample,  // Audio sample output (DC removed)
+    (* mark_debug = "true" *) output reg [15:0] audio_sample,  // Audio sample output
     (* mark_debug = "true" *) output reg sample_valid          // Sample valid signal
 );
-
-    //=========================================================================
-    // DC Offset Removal (High-Pass Filter)
-    //=========================================================================
-    // Simple 1st order IIR high-pass filter: y[n] = alpha * (y[n-1] + x[n] - x[n-1])
-    // where alpha = 0.99 (DC blocking, cutoff ~25 Hz at 16kHz sample rate)
-    
-    parameter ALPHA_SHIFT = 7;  // alpha = 1 - 1/128 = 0.9922 (close to 0.99)
-    
-    reg signed [15:0] raw_sample;
-    reg signed [15:0] prev_raw_sample;
-    reg signed [31:0] dc_accumulator;
-    wire signed [31:0] dc_removed;
-    
-    // DC removal: output = input - running average
-    assign dc_removed = {raw_sample, 16'd0} - dc_accumulator;
 
     //=========================================================================
     // Clock Generation for 16 kHz Sample Rate
@@ -82,15 +66,18 @@ module i2s_rx (
     //=========================================================================
     // I2S Data Reception (Left Channel Only)
     //=========================================================================
+    // SPH0645 timing:
+    // - Data valid on BCLK rising edge
+    // - MSB first (bit 17 down to bit 0, 18-bit data)
+    // - Left channel when LRCLK = LOW
+    // - First data bit appears one BCLK cycle after LRCLK transition
+    
     reg [31:0] shift_reg;
     reg lrclk_prev;
     
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             shift_reg <= 32'd0;
-            raw_sample <= 16'd0;
-            prev_raw_sample <= 16'd0;
-            dc_accumulator <= 32'd0;
             audio_sample <= 16'd0;
             sample_valid <= 1'b0;
             lrclk_prev <= 1'b0;
@@ -98,23 +85,19 @@ module i2s_rx (
             lrclk_prev <= lrclk_reg;
             sample_valid <= 1'b0;
             
-            // Shift data on BCLK falling edge
-            if (bclk_div == 7'd48 && bclk_reg == 1'b1) begin
+            // Sample data on BCLK rising edge (when bclk_reg transitions from 0 to 1)
+            if (bclk_div == 7'd0 && bclk_reg == 1'b0) begin
                 shift_reg <= {shift_reg[30:0], i2s_dout};
-                
-                // When we finish 32 bits of left channel (LRCLK was low)
-                if (bit_counter == 6'd31 && lrclk_prev == 1'b0) begin
-                    // SPH0645 gives 18-bit data in upper bits, take [31:16]
-                    raw_sample <= shift_reg[31:16];
-                    
-                    // Update DC blocking filter
-                    // Exponential moving average: dc_acc = dc_acc - dc_acc/128 + raw_sample
-                    dc_accumulator <= dc_accumulator - (dc_accumulator >>> ALPHA_SHIFT) + {raw_sample, 16'd0};
-                    
-                    // Output DC-removed sample (scaled back down)
-                    audio_sample <= dc_removed[31:16];
-                    sample_valid <= 1'b1;
-                end
+            end
+            
+            // Capture left channel sample when LRCLK transitions from LOW to HIGH
+            // This marks the end of left channel data
+            if (lrclk_prev == 1'b0 && lrclk_reg == 1'b1) begin
+                // SPH0645 has 18-bit data left-justified in 32-bit frame
+                // Bits [31:14] contain the 18-bit audio data
+                // Take bits [31:16] for 16-bit output (discard 2 LSBs)
+                audio_sample <= shift_reg[31:16];
+                sample_valid <= 1'b1;
             end
         end
     end
