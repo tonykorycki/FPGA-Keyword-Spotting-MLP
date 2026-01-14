@@ -4,11 +4,11 @@
 # Date: January 2026
 
 #==============================================================================
-# Clock signal (100 MHz)
+# Clock signal (50 MHz - reduced from 100MHz for timing closure)
 #==============================================================================
 set_property PACKAGE_PIN W5 [get_ports clk]							
 set_property IOSTANDARD LVCMOS33 [get_ports clk]
-create_clock -add -name sys_clk_pin -period 10.00 -waveform {0 5} [get_ports clk]
+create_clock -add -name sys_clk_pin -period 20.00 -waveform {0 10} [get_ports clk]
 
 #==============================================================================
 # Reset button (active high - btnC, active low internally)
