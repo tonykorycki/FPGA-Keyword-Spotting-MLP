@@ -21,6 +21,7 @@ module frame_buffer (
     reg [15:0] buffer [0:FRAME_SIZE*2-1]; // Double buffer to handle overlap (1024 samples)
     reg [9:0] write_ptr;  // Pointer to current write position (0-1023)
     reg processing;       // Flag indicating if frame is being processed
+    reg buffer_filled;    // Set after first 512 samples collected
 
     // Frame ready logic
     always @(posedge clk or negedge rst_n) begin
@@ -28,6 +29,7 @@ module frame_buffer (
             write_ptr <= 10'd0;
             frame_ready <= 1'b0;
             processing <= 1'b0;
+            buffer_filled <= 1'b0;
         end else begin
             // Reset frame_ready pulse
             frame_ready <= 1'b0;
@@ -36,19 +38,22 @@ module frame_buffer (
             if (sample_valid) begin
                 buffer[write_ptr] <= audio_sample;
                 
-                // Increment write pointer with wraparound (avoid modulo for synthesis)
+                // Check if we've collected enough samples for a new frame
+                // Trigger every FRAME_OVERLAP (256) samples for 50% overlap
+                // Trigger points: 511, 767, 1023, 255, 511, 767... (every 256 samples)
+                // Condition: lower 8 bits = 255, AND (ptr >= 511 OR buffer already filled)
+                if (!processing && (write_ptr[7:0] == 8'd255) && 
+                    (write_ptr >= 10'd511 || buffer_filled)) begin
+                    frame_ready <= 1'b1;
+                    processing <= 1'b1;
+                    buffer_filled <= 1'b1;  // Mark as filled after first frame
+                end
+                
+                // Increment write pointer with wraparound after checking trigger
                 if (write_ptr >= (FRAME_SIZE*2 - 1))
                     write_ptr <= 10'd0;
                 else
                     write_ptr <= write_ptr + 10'd1;
-                
-                // Check if we've collected enough samples for a new frame
-                // Trigger every FRAME_OVERLAP (256) samples for 50% overlap
-                if (!processing && (write_ptr == FRAME_OVERLAP - 1 || 
-                                   write_ptr == FRAME_SIZE + FRAME_OVERLAP - 1)) begin
-                    frame_ready <= 1'b1;
-                    processing <= 1'b1;
-                end
             end
             
             // Reset processing flag when frame is consumed

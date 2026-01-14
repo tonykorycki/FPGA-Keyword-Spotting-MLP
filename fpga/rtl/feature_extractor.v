@@ -47,8 +47,8 @@ module feature_extractor (
     genvar g;
     generate
         for (g = 0; g < 257; g = g + 1) begin : unpack_fft
-            assign fft_real[g] = fft_bins_packed[g*32 + 31 : g*32 + 16];
-            assign fft_imag[g] = fft_bins_packed[g*32 + 15 : g*32 + 0];
+            assign fft_real[g] = fft_bins_packed[g*32 + 16 +: 16];  // [31:16] = real
+            assign fft_imag[g] = fft_bins_packed[g*32 +: 16];       // [15:0] = imag
         end
     endgenerate
     
@@ -78,15 +78,17 @@ module feature_extractor (
     
     function [7:0] log2_approx;
         input [31:0] val;
-        reg [4:0] leading_zeros;
+        reg [5:0] leading_zeros;
         integer i;
+        reg found_one;
         begin
             leading_zeros = 0;
+            found_one = 0;
             for (i = 31; i >= 0; i = i - 1) begin
-                if (val[i] == 1'b0 && leading_zeros == 0)
+                if (val[i] == 1'b0 && !found_one)
                     leading_zeros = leading_zeros + 1;
                 else if (val[i] == 1'b1)
-                    i = -1;  // Break loop
+                    found_one = 1;  // Stop counting zeros once we see a 1
             end
             
             if (val == 0)
@@ -153,8 +155,15 @@ module feature_extractor (
                 //=============================================================
                 STATE_LOG_SCALE: begin
                 //=============================================================
-                    // Apply log approximation to current magnitude
-                    features[bin_index] <= log2_approx(magnitude[bin_index]);
+                    // Apply log approximation and scale to match quantized training data
+                    // Training uses log1p → normalize → ×127, giving range [0,127]
+                    // FPGA log2 gives [0,16], so multiply by 8 (shift left 3) to match
+                    // Clamp to 127 to avoid overflow into negative signed INT8 range
+                    begin : log_scale_block
+                        reg [7:0] scaled_log;
+                        scaled_log = log2_approx(magnitude[bin_index]) << 3;
+                        features[bin_index] <= (scaled_log > 8'd127) ? 8'd127 : scaled_log;
+                    end
                     
                     if (bin_index == 9'd256) begin
                         bin_index <= 9'd0;

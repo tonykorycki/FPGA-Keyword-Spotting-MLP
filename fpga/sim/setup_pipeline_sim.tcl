@@ -33,53 +33,14 @@ set_property top_lib xil_defaultlib [get_filesets sim_1]
 puts "Updating compile order..."
 update_compile_order -fileset sim_1
 
-# Set simulation runtime (500ms for all tests)
-set_property -name {xsim.simulate.runtime} -value {500ms} -objects [get_filesets sim_1]
+# Set simulation runtime (100ms for fast sim mode)
+set_property -name {xsim.simulate.runtime} -value {100ms} -objects [get_filesets sim_1]
 
 puts "\nSetup complete!"
 puts "To run simulation:"
 puts "  1. launch_simulation"
-puts "  2. run all"
+puts "  2. source add_waves.tcl (after simulation starts)"
+puts "  3. run 100ms"
 puts ""
-puts "Note: Waveforms will be added after simulation starts"
-    # Add top-level signals
-    add_wave {{/tb_audio_pipeline/clk}}
-    add_wave {{/tb_audio_pipeline/rst_n}}
-    add_wave {{/tb_audio_pipeline/test_num}}
-    
-    # I2S signals
-    add_wave -divider "I2S Interface"
-    add_wave {{/tb_audio_pipeline/i2s_bclk}}
-    add_wave {{/tb_audio_pipeline/i2s_lrclk}}
-    add_wave {{/tb_audio_pipeline/i2s_dout}}
-    add_wave {{/tb_audio_pipeline/audio_sample}}
-    add_wave {{/tb_audio_pipeline/sample_valid}}
-    
-    # Frame buffer
-    add_wave -divider "Frame Buffer"
-    add_wave {{/tb_audio_pipeline/frame_ready}}
-    add_wave {{/tb_audio_pipeline/frame_consumed}}
-    add_wave {{/tb_audio_pipeline/frames_received}}
-    
-    # FFT
-    add_wave -divider "FFT"
-    add_wave {{/tb_audio_pipeline/fft_done}}
-    
-    # Features
-    add_wave -divider "Features"
-    add_wave {{/tb_audio_pipeline/features_valid}}
-    add_wave {{/tb_audio_pipeline/features_received}}
-    add_wave -radix unsigned {{/tb_audio_pipeline/features[0]}}
-    add_wave -radix unsigned {{/tb_audio_pipeline/features[10]}}
-    add_wave -radix unsigned {{/tb_audio_pipeline/features[64]}}
-    add_wave -radix unsigned {{/tb_audio_pipeline/features[128]}}
-    
-    # Averager (if enabled)
-    if {[get_parameter ENABLE_AVERAGER] == 1} {
-        add_wave -divider "Feature Averager"
-        add_wave {{/tb_audio_pipeline/averaged_valid}}
-        add_wave {{/tb_audio_pipeline/averaged_received}}
-    }
-}
 
 

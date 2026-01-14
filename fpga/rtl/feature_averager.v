@@ -92,28 +92,20 @@ module feature_averager #(
                 // Update ring buffer and running sum
                 for (i = 0; i < NUM_FEATURES; i = i + 1) begin
                     if (warmup_complete) begin
-                        // Subtract oldest frame from running sum
+                        // Subtract oldest frame from running sum, add new frame
                         running_sum[i] <= running_sum[i] 
                                         - feature_buffer[write_ptr][i]
                                         + frame_features_unpacked[i];
+                        // Compute average: divide by 32 (close to 31, uses simple shift)
+                        averaged_features_unpacked[i] <= running_sum[i] >>> 5;
                     end else begin
-                        // Warmup phase: just accumulate
+                        // Warmup phase: just accumulate, don't output yet
                         running_sum[i] <= running_sum[i] + frame_features_unpacked[i];
+                        averaged_features_unpacked[i] <= 0;  // Output zeros during warmup
                     end
                     
                     // Store new frame in ring buffer
                     feature_buffer[write_ptr][i] <= frame_features_unpacked[i];
-                    
-                    // Compute average (divide by number of frames)
-                    // Use shift for power-of-2 approximation: 31 ≈ 32 = 2^5
-                    // For exact division by 31, use: running_sum[i] / WINDOW_FRAMES
-                    if (warmup_complete) begin
-                        averaged_features_unpacked[i] <= running_sum[i] >>> 5;  // Divide by 32 (close to 31)
-                        // Alternative exact: averaged_features_unpacked[i] <= running_sum[i] / WINDOW_FRAMES;
-                    end else begin
-                        // During warmup, divide by current frame count
-                        averaged_features_unpacked[i] <= running_sum[i] / (frame_count + 1);
-                    end
                 end
                 
                 // Update pointers and counters
@@ -123,8 +115,9 @@ module feature_averager #(
                     frame_count <= frame_count + 5'd1;
                 end
                 
-                // Output is valid once we have at least one frame
-                averaged_valid <= 1'b1;
+                // Output is only valid after warmup complete (have full 1-second window)
+                // This avoids false detections during startup
+                averaged_valid <= warmup_complete;
             end
         end
     end

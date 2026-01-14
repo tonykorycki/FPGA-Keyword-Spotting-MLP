@@ -19,6 +19,7 @@ module tb_fft;
     wire done;
     wire [DATA_WIDTH-1:0] y_real [0:FFT_POINTS-1];
     wire [DATA_WIDTH-1:0] y_imag [0:FFT_POINTS-1];
+    integer i;  // Loop variable
     
     // Instantiate the FFT core
     fft_core #(
@@ -49,7 +50,7 @@ module tb_fft;
         start = 0;
         
         // Initialize input data to zeros
-        for (integer i = 0; i < FFT_POINTS; i++) begin
+        for (i = 0; i < FFT_POINTS; i = i + 1) begin
             x_real[i] = 16'd0;
             x_imag[i] = 16'd0;
         end
@@ -60,7 +61,7 @@ module tb_fft;
         #(CLOCK_PERIOD*10);
         
         // Generate sine wave input
-        for (integer i = 0; i < FFT_POINTS; i++) begin
+        for (i = 0; i < FFT_POINTS; i = i + 1) begin
             // Simple sine wave at frequency bin 4
             x_real[i] = $rtoi($sin(2*3.14159*4*i/FFT_POINTS) * 32767);
             x_imag[i] = 16'd0;

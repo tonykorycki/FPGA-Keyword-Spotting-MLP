@@ -177,6 +177,8 @@ module fft_core (
                         config_tvalid <= 1'b0;
                         state <= STATE_STREAM_IN;
                         data_in_tvalid <= 1'b1;
+                        // Pre-load first sample so it's valid when tvalid goes high
+                        data_in_tdata <= {frame_samples[0], 16'd0};
                     end
                 end
                 

@@ -74,6 +74,7 @@ module top (
     // FFT Core - Xilinx FFT IP Wrapper
     wire                fft_done;
     wire [8223:0]       fft_bins_packed;  // 257 bins × 32 bits (real+imag)
+    wire                fft_consumed;     // Handshake from feature extractor
     
     fft_core fft (
         .clk(clk),
@@ -85,13 +86,35 @@ module top (
         .fft_done(fft_done)
     );
     
-    // Feature Extractor (TODO)
+    // Feature Extractor
     // Converts FFT spectrum to 257 INT8 features: magnitude -> log -> quantize
-    wire                frame_features_valid;
-    wire [4111:0]       frame_features;  // Raw per-frame features (257*16 = 4112 bits)
+    wire                features_valid_int8;
+    wire [2055:0]       features_packed_int8;  // 257 × 8 bits = 2056 bits
     
-    assign frame_features_valid = 1'b0;
-    assign frame_features = {4112{1'b0}};  // TODO: Connect to feature extractor
+    feature_extractor feat_extr (
+        .clk(clk),
+        .rst_n(rst_n),
+        .fft_bins_packed(fft_bins_packed),
+        .fft_valid(fft_done),
+        .fft_consumed(fft_consumed),           // Output: tells FFT "data received"
+        .features_packed(features_packed_int8),
+        .features_valid(features_valid_int8)
+    );
+    
+    // Convert INT8 features to INT16 for averager
+    // (Averager expects 16-bit inputs for accumulation headroom)
+    wire [4111:0] frame_features;  // 257 × 16 bits = 4112 bits
+    wire frame_features_valid;
+    
+    assign frame_features_valid = features_valid_int8;
+    
+    genvar k;
+    generate
+        for (k = 0; k < 257; k = k + 1) begin : expand_features
+            // Sign-extend INT8 to INT16
+            assign frame_features[k*16 +: 16] = {{8{features_packed_int8[k*8+7]}}, features_packed_int8[k*8 +: 8]};
+        end
+    endgenerate
     
     // Feature Averager - 1s sliding window (matches training distribution)
     wire [4111:0]       averaged_features_16bit;  // 257*16 = 4112 bits
@@ -114,14 +137,14 @@ module top (
     // Convert averaged features from int16 to int8 for inference
     // Extract each 16-bit feature, saturate to int8, and pack into bit vector
     wire [2055:0] features_packed;
-    genvar k;
+    genvar j;
     generate
-        for (k = 0; k < 257; k = k + 1) begin : quantize_and_pack_features
+        for (j = 0; j < 257; j = j + 1) begin : quantize_and_pack_features
             wire signed [15:0] feature_16bit;
             wire signed [7:0] feature_8bit;
             
             // Extract 16-bit feature from packed vector
-            assign feature_16bit = averaged_features_16bit[k*16 +: 16];
+            assign feature_16bit = averaged_features_16bit[j*16 +: 16];
             
             // Saturate to int8 range [-128, 127]
             assign feature_8bit = (feature_16bit > 127) ? 8'd127 :
@@ -129,7 +152,7 @@ module top (
                                   feature_16bit[7:0];
             
             // Pack into output vector
-            assign features_packed[k*8 +: 8] = feature_8bit;
+            assign features_packed[j*8 +: 8] = feature_8bit;
         end
     endgenerate
     
