@@ -9,6 +9,7 @@
 //
 // Author: Tony Korycki
 // Date: November 18, 2025
+// Modified: January 14, 2026 - Synchronous reset for BRAM inference
 //=============================================================================
 
 module feature_averager #(
@@ -42,8 +43,9 @@ module feature_averager #(
         end
     endgenerate
     
-    // Ring buffer to store last WINDOW_FRAMES frames
-    reg signed [FEATURE_WIDTH-1:0] feature_buffer [0:WINDOW_FRAMES-1][0:NUM_FEATURES-1];
+    // Ring buffer to store last WINDOW_FRAMES frames - no async reset for RAM inference
+    // This is 31 × 257 × 16 = 127,472 bits - should map to BRAM with sync reset
+    (* ram_style = "block" *) reg signed [FEATURE_WIDTH-1:0] feature_buffer [0:WINDOW_FRAMES-1][0:NUM_FEATURES-1];
     
     // Running sum for each feature (wider to prevent overflow)
     reg signed [SUM_WIDTH-1:0] running_sum [0:NUM_FEATURES-1];
@@ -68,22 +70,25 @@ module feature_averager #(
     wire warmup_complete = (frame_count >= WINDOW_FRAMES);
     
     //=========================================================================
-    // Sliding Window Logic
+    // Sliding Window Logic - Synchronous reset for BRAM compatibility
     //=========================================================================
     
     integer i;
     
-    always @(posedge clk or negedge rst_n) begin
+    always @(posedge clk) begin
         if (!rst_n) begin
-            // Reset all registers
+            // Reset control registers only (not the RAM contents)
             write_ptr <= 5'd0;
             frame_count <= 5'd0;
             averaged_valid <= 1'b0;
             
-            // Clear ring buffer and running sum
+            // Clear running sum (this is small, ~6K bits)
             for (i = 0; i < NUM_FEATURES; i = i + 1) begin
                 running_sum[i] <= {SUM_WIDTH{1'b0}};
+                averaged_features_unpacked[i] <= {FEATURE_WIDTH{1'b0}};
             end
+            // Note: feature_buffer is NOT reset - it gets filled during warmup
+            // before any values are subtracted, so no garbage data issues
             
         end else begin
             averaged_valid <= 1'b0;

@@ -223,6 +223,7 @@ module inference #(
     
     integer i;
     
+    // Asynchronous reset for control logic (RAM arrays are NOT reset)
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             state <= STATE_IDLE;

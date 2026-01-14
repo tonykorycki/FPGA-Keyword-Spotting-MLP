@@ -2,6 +2,7 @@
 // This module buffers audio samples into frames for processing
 // Author: 
 // Date: October 17, 2025
+// Modified: January 14, 2026 - Sync reset for RAM to enable BRAM inference
 
 module frame_buffer (
     input wire clk,                  // System clock
@@ -17,14 +18,14 @@ module frame_buffer (
     parameter FRAME_SIZE = 512;  // Number of samples per frame (for 512-point FFT)
     parameter FRAME_OVERLAP = 256; // 50% overlap between consecutive frames
 
-    // Internal registers
-    reg [15:0] buffer [0:FRAME_SIZE*2-1]; // Double buffer to handle overlap (1024 samples)
+    // Internal registers - Buffer uses synchronous behavior (no async reset for BRAM)
+    (* ram_style = "block" *) reg [15:0] buffer [0:FRAME_SIZE*2-1]; // Double buffer (1024 samples)
     reg [9:0] write_ptr;  // Pointer to current write position (0-1023)
     reg processing;       // Flag indicating if frame is being processed
     reg buffer_filled;    // Set after first 512 samples collected
 
-    // Frame ready logic
-    always @(posedge clk or negedge rst_n) begin
+    // Control logic with synchronous reset for BRAM compatibility
+    always @(posedge clk) begin
         if (!rst_n) begin
             write_ptr <= 10'd0;
             frame_ready <= 1'b0;

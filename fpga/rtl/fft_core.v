@@ -126,6 +126,7 @@ module fft_core (
     //=========================================================================
     // Output Bin Storage (257 complex bins)
     //=========================================================================
+    // No async reset for RAM - enables distributed RAM inference
     reg signed [15:0] bin_real [0:256];
     reg signed [15:0] bin_imag [0:256];
     
@@ -139,9 +140,9 @@ module fft_core (
     end
     
     //=========================================================================
-    // Control State Machine
+    // Control State Machine - Synchronous reset for RAM compatibility
     //=========================================================================
-    always @(posedge clk or negedge rst_n) begin
+    always @(posedge clk) begin
         if (!rst_n) begin
             state <= STATE_IDLE;
             sample_counter <= 10'd0;

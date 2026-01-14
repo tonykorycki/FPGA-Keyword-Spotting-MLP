@@ -58,6 +58,7 @@ module feature_extractor (
     // mag[i] = |real[i]| + |imag[i]|  (cheaper than sqrt)
     // Close approximation to Euclidean distance for scaling purposes
     
+    // Use distributed RAM (sync reset already applied to state machine)
     reg [31:0] magnitude [0:256];       // Magnitude values (unsigned)
     reg [31:0] max_magnitude;           // Maximum magnitude for scaling
     reg [31:0] current_mag;
@@ -99,14 +100,14 @@ module feature_extractor (
     endfunction
     
     //=========================================================================
-    // Feature Buffer (Intermediate Storage)
+    // Feature Buffer (Intermediate Storage) - No async reset for RAM
     //=========================================================================
     reg [7:0] features [0:256];
     
     //=========================================================================
-    // Main State Machine
+    // Main State Machine - Synchronous reset for RAM compatibility
     //=========================================================================
-    always @(posedge clk or negedge rst_n) begin
+    always @(posedge clk) begin
         if (!rst_n) begin
             state <= STATE_IDLE;
             bin_index <= 9'd0;
