@@ -10,21 +10,30 @@ module frame_buffer (
     input wire [15:0] audio_sample,  // Input audio sample
     input wire sample_valid,         // Sample valid signal
     input wire frame_consumed,       // Signal that downstream has consumed the frame
-    output reg frame_ready,          // Frame ready signal
-    output wire [8191:0] frame_data_packed  // Frame data (512 samples × 16 bits = 8192 bits)
+    output reg frame_ready,          // Frame ready signal (pulses when new frame available)
+    output reg [15:0] frame_sample,  // Serial output: one sample per cycle
+    output reg frame_sample_valid    // Valid signal for serial output
 );
 
     // Parameters
     parameter FRAME_SIZE = 512;  // Number of samples per frame (for 512-point FFT)
     parameter FRAME_OVERLAP = 256; // 50% overlap between consecutive frames
 
-    // Internal registers - Buffer uses synchronous behavior (no async reset for BRAM)
+    // Internal registers - BRAM-friendly with serial access
     (* ram_style = "block" *) reg [15:0] buffer [0:FRAME_SIZE*2-1]; // Double buffer (1024 samples)
     reg [9:0] write_ptr;  // Pointer to current write position (0-1023)
     reg processing;       // Flag indicating if frame is being processed
     reg buffer_filled;    // Set after first 512 samples collected
+    
+    // Serialization state machine
+    localparam READ_IDLE = 1'b0;
+    localparam READ_STREAM = 1'b1;
+    
+    reg read_state;
+    reg [9:0] read_ptr;   // Pointer for serial readout
+    reg [8:0] read_count; // Count samples read (0-511)
 
-    // Control logic with synchronous reset for BRAM compatibility
+    // Write control logic with synchronous reset
     always @(posedge clk) begin
         if (!rst_n) begin
             write_ptr <= 10'd0;
@@ -64,8 +73,7 @@ module frame_buffer (
         end
     end
 
-    // Output frame data as packed bit vector
-    // Extract 512 contiguous samples starting from the oldest position
+    // Serial readout state machine
     reg [9:0] read_base;
     
     always @(*) begin
@@ -76,15 +84,45 @@ module frame_buffer (
             read_base = write_ptr + FRAME_SIZE;
     end
     
-    // Pack 512 samples into output bit vector
-    genvar i;
-    generate
-        for (i = 0; i < FRAME_SIZE; i = i + 1) begin: FRAME_OUTPUT
-            wire [9:0] read_addr;
-            assign read_addr = (read_base + i >= FRAME_SIZE*2) ? 
-                              (read_base + i - FRAME_SIZE*2) : (read_base + i);
-            assign frame_data_packed[i*16 +: 16] = buffer[read_addr];
+    always @(posedge clk) begin
+        if (!rst_n) begin
+            read_state <= READ_IDLE;
+            read_ptr <= 10'd0;
+            read_count <= 9'd0;
+            frame_sample <= 16'd0;
+            frame_sample_valid <= 1'b0;
+        end else begin
+            case (read_state)
+                READ_IDLE: begin
+                    frame_sample_valid <= 1'b0;
+                    if (frame_ready) begin
+                        // Start streaming out frame
+                        read_ptr <= read_base;
+                        read_count <= 9'd0;
+                        read_state <= READ_STREAM;
+                    end
+                end
+                
+                READ_STREAM: begin
+                    // Output one sample per cycle
+                    frame_sample <= buffer[read_ptr];
+                    frame_sample_valid <= 1'b1;
+                    
+                    // Advance read pointer with wraparound
+                    if (read_ptr >= (FRAME_SIZE*2 - 1))
+                        read_ptr <= 10'd0;
+                    else
+                        read_ptr <= read_ptr + 10'd1;
+                    
+                    // Check if done
+                    if (read_count == FRAME_SIZE - 1) begin
+                        read_state <= READ_IDLE;
+                    end else begin
+                        read_count <= read_count + 9'd1;
+                    end
+                end
+            endcase
         end
-    endgenerate
+    end
 
 endmodule

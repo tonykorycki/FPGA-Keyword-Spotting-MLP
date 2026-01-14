@@ -56,9 +56,10 @@ module top (
         .sample_valid(sample_valid)
     );
     
-    // Frame Buffer
+    // Frame Buffer - Serial output
     wire                frame_ready;
-    wire [8191:0]       frame_data_packed;  // 512 samples × 16 bits
+    wire [15:0]         frame_sample;      // Serial: one sample per cycle
+    wire                frame_sample_valid;
     wire                frame_consumed;
     
     frame_buffer fb (
@@ -68,10 +69,11 @@ module top (
         .sample_valid(sample_valid),
         .frame_consumed(frame_consumed),
         .frame_ready(frame_ready),
-        .frame_data_packed(frame_data_packed)
+        .frame_sample(frame_sample),
+        .frame_sample_valid(frame_sample_valid)
     );
     
-    // FFT Core - Xilinx FFT IP Wrapper
+    // FFT Core - Xilinx FFT IP Wrapper (serial input)
     wire                fft_done;
     wire [8223:0]       fft_bins_packed;  // 257 bins × 32 bits (real+imag)
     wire                fft_consumed;     // Handshake from feature extractor
@@ -79,8 +81,8 @@ module top (
     fft_core fft (
         .clk(clk),
         .rst_n(rst_n),
-        .frame_data_packed(frame_data_packed),
-        .frame_valid(frame_ready),
+        .frame_sample(frame_sample),
+        .frame_sample_valid(frame_sample_valid),
         .frame_consumed(frame_consumed),
         .fft_bins_packed(fft_bins_packed),
         .fft_done(fft_done)

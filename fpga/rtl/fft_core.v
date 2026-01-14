@@ -16,10 +16,10 @@ module fft_core (
     input  wire        clk,                      // System clock (100 MHz)
     input  wire        rst_n,                    // Active low reset
     
-    // Input interface - packed frame data
-    input  wire [8191:0] frame_data_packed,      // 512 samples × 16 bits
-    input  wire          frame_valid,            // Start FFT processing
-    output reg           frame_consumed,         // Frame has been consumed
+    // Input interface - serial samples
+    input  wire [15:0] frame_sample,             // One sample per cycle
+    input  wire        frame_sample_valid,       // Sample valid signal
+    output reg         frame_consumed,           // Frame has been consumed
     
     // Output interface - packed FFT bins
     output reg [8223:0]  fft_bins_packed,        // 257 bins × 32 bits (real+imag)
@@ -38,17 +38,6 @@ module fft_core (
     
     reg [2:0] state;
     reg [9:0] sample_counter;  // 0-511 for input, 0-511 for output
-    
-    //=========================================================================
-    // Unpack Input Frame Data
-    //=========================================================================
-    wire signed [15:0] frame_samples [0:511];
-    genvar g;
-    generate
-        for (g = 0; g < 512; g = g + 1) begin : unpack_frame
-            assign frame_samples[g] = frame_data_packed[g*16 +: 16];
-        end
-    endgenerate
     
     //=========================================================================
     // FFT IP AXI-Stream Signals
@@ -164,7 +153,7 @@ module fft_core (
             case (state)
                 //-------------------------------------------------------------
                 STATE_IDLE: begin
-                    if (frame_valid) begin
+                    if (frame_sample_valid) begin
                         state <= STATE_CONFIG;
                         sample_counter <= 10'd0;
                         config_tvalid <= 1'b1;
@@ -177,19 +166,18 @@ module fft_core (
                     if (config_tvalid && config_tready) begin
                         config_tvalid <= 1'b0;
                         state <= STATE_STREAM_IN;
-                        data_in_tvalid <= 1'b1;
-                        // Pre-load first sample so it's valid when tvalid goes high
-                        data_in_tdata <= {frame_samples[0], 16'd0};
+                        data_in_tvalid <= 1'b0;  // Wait for first valid sample
                     end
                 end
                 
                 //-------------------------------------------------------------
                 STATE_STREAM_IN: begin
-                    // Stream 512 samples into FFT
-                    if (data_in_tvalid && data_in_tready) begin
+                    // Stream 512 samples into FFT (serial input)
+                    if (frame_sample_valid) begin
                         // Pack real sample with zero imaginary
                         // TDATA format: [31:16]=real, [15:0]=imag
-                        data_in_tdata <= {frame_samples[sample_counter], 16'd0};
+                        data_in_tdata <= {frame_sample, 16'd0};
+                        data_in_tvalid <= 1'b1;
                         
                         if (sample_counter == 10'd511) begin
                             // Last sample
@@ -202,6 +190,8 @@ module fft_core (
                             data_in_tlast <= 1'b0;
                             sample_counter <= sample_counter + 10'd1;
                         end
+                    end else begin
+                        data_in_tvalid <= 1'b0;
                     end
                 end
                 

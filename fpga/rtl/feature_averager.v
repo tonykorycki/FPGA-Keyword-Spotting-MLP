@@ -43,15 +43,19 @@ module feature_averager #(
         end
     endgenerate
     
-    // Ring buffer to store last WINDOW_FRAMES frames - no async reset for RAM inference
-    // This is 31 × 257 × 16 = 127,472 bits - should map to BRAM with sync reset
-    (* ram_style = "block" *) reg signed [FEATURE_WIDTH-1:0] feature_buffer [0:WINDOW_FRAMES-1][0:NUM_FEATURES-1];
+    // Ring buffer to store last WINDOW_FRAMES frames - flattened 1D for BRAM inference
+    // Address = frame*NUM_FEATURES + feature_idx
+    // 31 × 257 = 7967 entries × 16 bits = 127,472 bits total
+    (* ram_style = "block" *) reg signed [FEATURE_WIDTH-1:0] feature_buffer [0:WINDOW_FRAMES*NUM_FEATURES-1];
     
     // Running sum for each feature (wider to prevent overflow)
     reg signed [SUM_WIDTH-1:0] running_sum [0:NUM_FEATURES-1];
     
     // Internal averaged features (unpacked)
     reg signed [FEATURE_WIDTH-1:0] averaged_features_unpacked [0:NUM_FEATURES-1];
+    
+    // Serialization index for processing features one at a time
+    reg [8:0] feature_idx;  // 0 to 256
     
     // Pack output features to bit vector
     generate
@@ -69,8 +73,20 @@ module feature_averager #(
     reg [4:0] frame_count;
     wire warmup_complete = (frame_count >= WINDOW_FRAMES);
     
+    // State machine for serialized processing
+    localparam STATE_IDLE = 2'd0;
+    localparam STATE_PROCESS = 2'd1;
+    localparam STATE_DONE = 2'd2;
+    
+    reg [1:0] state;
+    
+    // Address calculation for flattened buffer
+    // buffer[frame][feature] = feature_buffer[frame * NUM_FEATURES + feature]
+    wire [13:0] write_addr = write_ptr * NUM_FEATURES + feature_idx;  // Up to 7967
+    wire [13:0] read_addr = write_ptr * NUM_FEATURES + feature_idx;   // Same location (oldest frame)
+    
     //=========================================================================
-    // Sliding Window Logic - Synchronous reset for BRAM compatibility
+    // Sliding Window Logic - Serialized (one feature per cycle)
     //=========================================================================
     
     integer i;
@@ -81,6 +97,8 @@ module feature_averager #(
             write_ptr <= 5'd0;
             frame_count <= 5'd0;
             averaged_valid <= 1'b0;
+            feature_idx <= 9'd0;
+            state <= STATE_IDLE;
             
             // Clear running sum (this is small, ~6K bits)
             for (i = 0; i < NUM_FEATURES; i = i + 1) begin
@@ -88,45 +106,73 @@ module feature_averager #(
                 averaged_features_unpacked[i] <= {FEATURE_WIDTH{1'b0}};
             end
             // Note: feature_buffer is NOT reset - it gets filled during warmup
-            // before any values are subtracted, so no garbage data issues
             
         end else begin
             averaged_valid <= 1'b0;
             
-            if (frame_valid) begin
-                // Update ring buffer and running sum
-                for (i = 0; i < NUM_FEATURES; i = i + 1) begin
+            case (state)
+                //=============================================================
+                STATE_IDLE: begin
+                //=============================================================
+                    if (frame_valid) begin
+                        feature_idx <= 9'd0;
+                        state <= STATE_PROCESS;
+                    end
+                end
+                
+                //=============================================================
+                STATE_PROCESS: begin
+                //=============================================================
+                    // Process one feature per cycle
                     if (warmup_complete) begin
-                        // Subtract oldest frame from running sum, add new frame
-                        running_sum[i] <= running_sum[i] 
-                                        - feature_buffer[write_ptr][i]
-                                        + frame_features_unpacked[i];
-                        // Compute average from UPDATED running sum (divide by 32)
-                        // Use the same expression to avoid 1-cycle timing mismatch
-                        averaged_features_unpacked[i] <= (running_sum[i] 
-                                        - feature_buffer[write_ptr][i]
-                                        + frame_features_unpacked[i]) >>> 5;
+                        // Read oldest value from buffer and new input value
+                        // Update running sum: subtract old, add new
+                        running_sum[feature_idx] <= running_sum[feature_idx] 
+                                                  - feature_buffer[read_addr] 
+                                                  + frame_features_unpacked[feature_idx];
+                        
+                        // Compute average from updated sum (divide by 32 = shift right 5)
+                        averaged_features_unpacked[feature_idx] <= 
+                            (running_sum[feature_idx] - feature_buffer[read_addr] 
+                             + frame_features_unpacked[feature_idx]) >>> 5;
+                        
                     end else begin
-                        // Warmup phase: just accumulate, don't output yet
-                        running_sum[i] <= running_sum[i] + frame_features_unpacked[i];
-                        averaged_features_unpacked[i] <= 0;  // Output zeros during warmup
+                        // Warmup phase: just accumulate
+                        running_sum[feature_idx] <= running_sum[feature_idx] 
+                                                  + frame_features_unpacked[feature_idx];
+                        averaged_features_unpacked[feature_idx] <= 16'sd0;
                     end
                     
-                    // Store new frame in ring buffer
-                    feature_buffer[write_ptr][i] <= frame_features_unpacked[i];
+                    // Write new value to buffer
+                    feature_buffer[write_addr] <= frame_features_unpacked[feature_idx];
+                    
+                    // Move to next feature
+                    if (feature_idx == NUM_FEATURES - 1) begin
+                        state <= STATE_DONE;
+                    end else begin
+                        feature_idx <= feature_idx + 9'd1;
+                    end
                 end
                 
-                // Update pointers and counters
-                write_ptr <= (write_ptr == WINDOW_FRAMES - 1) ? 5'd0 : write_ptr + 5'd1;
-                
-                if (!warmup_complete) begin
-                    frame_count <= frame_count + 5'd1;
+                //=============================================================
+                STATE_DONE: begin
+                //=============================================================
+                    // Update pointers and counters
+                    write_ptr <= (write_ptr == WINDOW_FRAMES - 1) ? 5'd0 : write_ptr + 5'd1;
+                    
+                    if (!warmup_complete) begin
+                        frame_count <= frame_count + 5'd1;
+                    end
+                    
+                    // Output is valid after warmup complete
+                    averaged_valid <= warmup_complete;
+                    
+                    // Return to idle
+                    state <= STATE_IDLE;
                 end
                 
-                // Output is only valid after warmup complete (have full 1-second window)
-                // This avoids false detections during startup
-                averaged_valid <= warmup_complete;
-            end
+                default: state <= STATE_IDLE;
+            endcase
         end
     end
 
