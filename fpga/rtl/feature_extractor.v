@@ -135,14 +135,16 @@ module feature_extractor (
                 //=============================================================
                 STATE_COMPUTE_MAG: begin
                 //=============================================================
-                    // Compute magnitude for current bin (combinational)
-                    current_mag = abs_value(fft_real[bin_index]) + 
-                                  abs_value(fft_imag[bin_index]);
-                    magnitude[bin_index] <= current_mag;
+                    // Compute magnitude for current bin
+                    // Use non-blocking for registered outputs
+                    current_mag <= abs_value(fft_real[bin_index]) + 
+                                   abs_value(fft_imag[bin_index]);
+                    magnitude[bin_index] <= abs_value(fft_real[bin_index]) + 
+                                            abs_value(fft_imag[bin_index]);
                     
-                    // Track maximum
-                    if (current_mag > max_magnitude)
-                        max_magnitude <= current_mag;
+                    // Track maximum (compare against newly computed value)
+                    if ((abs_value(fft_real[bin_index]) + abs_value(fft_imag[bin_index])) > max_magnitude)
+                        max_magnitude <= abs_value(fft_real[bin_index]) + abs_value(fft_imag[bin_index]);
                     
                     if (bin_index == 9'd256) begin
                         bin_index <= 9'd0;

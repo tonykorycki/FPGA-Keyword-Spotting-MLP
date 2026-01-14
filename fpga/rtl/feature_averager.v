@@ -96,8 +96,11 @@ module feature_averager #(
                         running_sum[i] <= running_sum[i] 
                                         - feature_buffer[write_ptr][i]
                                         + frame_features_unpacked[i];
-                        // Compute average: divide by 32 (close to 31, uses simple shift)
-                        averaged_features_unpacked[i] <= running_sum[i] >>> 5;
+                        // Compute average from UPDATED running sum (divide by 32)
+                        // Use the same expression to avoid 1-cycle timing mismatch
+                        averaged_features_unpacked[i] <= (running_sum[i] 
+                                        - feature_buffer[write_ptr][i]
+                                        + frame_features_unpacked[i]) >>> 5;
                     end else begin
                         // Warmup phase: just accumulate, don't output yet
                         running_sum[i] <= running_sum[i] + frame_features_unpacked[i];
