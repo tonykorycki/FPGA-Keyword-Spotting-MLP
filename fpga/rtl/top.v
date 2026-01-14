@@ -166,7 +166,12 @@ module top (
     assign logits[0] = logits_packed[31:0];
     assign logits[1] = logits_packed[63:32];
     
-    inference nn_engine (
+    inference #(
+        .WEIGHTS_FILE("C:/Users/koryc/fpga-kws/models/mem/weights_combined.mem"),
+        .LAYER0_BIAS_FILE("C:/Users/koryc/fpga-kws/models/mem/layer0_bias.mem"),
+        .LAYER1_BIAS_FILE("C:/Users/koryc/fpga-kws/models/mem/layer1_bias.mem"),
+        .LAYER2_BIAS_FILE("C:/Users/koryc/fpga-kws/models/mem/layer2_bias.mem")
+    ) nn_engine (
         .clk(clk),
         .rst_n(rst_n),
         .features(features_packed),
