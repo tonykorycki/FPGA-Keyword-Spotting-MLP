@@ -16,6 +16,7 @@ module tb_top_stub;
     reg i2s_lrclk;
     wire [15:0] led;
     wire detected;
+    integer i;  // Loop variable
     
     // Instantiate the top module
     top top_inst (
@@ -59,7 +60,7 @@ module tb_top_stub;
         
         // Simulate sending audio data over I2S
         // In a real test, this would be a sine wave or recorded audio
-        for (integer i = 0; i < 1000; i++) begin
+        for (i = 0; i < 1000; i = i + 1) begin
             // For simplicity, toggle the data line based on counter
             // In a real test, this would be actual audio data
             i2s_sdin = (i % 7 == 0);

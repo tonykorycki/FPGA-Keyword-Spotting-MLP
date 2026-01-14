@@ -19,7 +19,9 @@ module top (
     
     // Status outputs
     output wire [15:0] led,
-    // Note: RGB LED16 removed - doesn't exist on Basys3 CPG236 package
+    output wire        led16_b,       // Blue: processing
+    output wire        led16_g,       // Green: inference
+    output wire        led16_r,       // Red: detection 
     
     // Configuration
     input  wire [15:0] sw
@@ -222,6 +224,8 @@ module top (
     end
     
     assign led = led_reg;
-    // RGB LED16 assignments removed - doesn't exist on Basys3 CPG236
+    assign led16_b = led_processing;
+    assign led16_g = led_inference;
+    assign led16_r = led_detection;
     
 endmodule

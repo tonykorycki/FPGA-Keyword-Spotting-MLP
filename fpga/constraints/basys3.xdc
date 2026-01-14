@@ -88,16 +88,16 @@ set_property IOSTANDARD LVCMOS33 [get_ports {led[14]}]
 set_property PACKAGE_PIN L1 [get_ports {led[15]}]					
 set_property IOSTANDARD LVCMOS33 [get_ports {led[15]}]
 
+
 #==============================================================================
-# RGB LED16 (active low, accent LED near standard LEDs)
-# NOTE: RGB LEDs don't exist on Basys3 CPG236 package - commenting out
+# RGB LED signals - Map to unused Pmod JB pins (no actual RGB LED on board)
 #==============================================================================
-#set_property PACKAGE_PIN N16 [get_ports led16_b]
-#set_property IOSTANDARD LVCMOS33 [get_ports led16_b]
-#set_property PACKAGE_PIN M16 [get_ports led16_g]
-#set_property IOSTANDARD LVCMOS33 [get_ports led16_g]
-#set_property PACKAGE_PIN R12 [get_ports led16_r]
-#set_property IOSTANDARD LVCMOS33 [get_ports led16_r]
+set_property PACKAGE_PIN A14 [get_ports led16_r]
+set_property IOSTANDARD LVCMOS33 [get_ports led16_r]
+set_property PACKAGE_PIN A16 [get_ports led16_g]
+set_property IOSTANDARD LVCMOS33 [get_ports led16_g]
+set_property PACKAGE_PIN B15 [get_ports led16_b]
+set_property IOSTANDARD LVCMOS33 [get_ports led16_b]
 
 #==============================================================================
 # Pmod Header JA - I2S Microphone Interface (SPH0645)
