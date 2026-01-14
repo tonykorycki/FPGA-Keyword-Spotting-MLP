@@ -52,11 +52,9 @@ module tb_inference;
     //=========================================================================
     
     inference #(
-        .LAYER0_WEIGHTS_FILE("C:/Users/koryc/fpga-kws/models/mem/layer0_weights.mem"),
+        .WEIGHTS_FILE("C:/Users/koryc/fpga-kws/models/mem/weights_combined.mem"),
         .LAYER0_BIAS_FILE("C:/Users/koryc/fpga-kws/models/mem/layer0_bias.mem"),
-        .LAYER1_WEIGHTS_FILE("C:/Users/koryc/fpga-kws/models/mem/layer1_weights.mem"),
         .LAYER1_BIAS_FILE("C:/Users/koryc/fpga-kws/models/mem/layer1_bias.mem"),
-        .LAYER2_WEIGHTS_FILE("C:/Users/koryc/fpga-kws/models/mem/layer2_weights.mem"),
         .LAYER2_BIAS_FILE("C:/Users/koryc/fpga-kws/models/mem/layer2_bias.mem")
     ) dut (
         .clk(clk),
