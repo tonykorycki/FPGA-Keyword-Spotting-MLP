@@ -200,7 +200,7 @@ module top (
 
     localparam HOLD_TIME = 26'd25_000_000;  // 500ms @ 50MHz
 
-    always @(posedge clk or negedge rst_n) begin
+    always @(posedge clk) begin
         if (!rst_n) begin
             led_reg <= 16'h0000;
             led_detection <= 1'b0;
