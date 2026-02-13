@@ -167,8 +167,8 @@ module fft_core (
                     data_in_tvalid <= 1'b0;
                     data_in_tlast <= 1'b0;
 
-                    // Capture first sample immediately so no frame sample is lost.
-                    if (config_done && frame_sample_valid) begin
+                    // Wait for FFT IP ready (tready) before starting frame input
+                    if (config_done && frame_sample_valid && data_in_tready) begin
                         data_in_tdata <= {frame_sample, 16'd0};
                         data_in_tvalid <= 1'b1;
                         sample_counter <= 10'd1;
@@ -179,22 +179,26 @@ module fft_core (
                 //-------------------------------------------------------------
                 STATE_STREAM_IN: begin
                     // Stream 512 samples into FFT (serial input)
+                    // AXI-Stream: advance only when tready accepts the sample.
+                    // Xilinx FFT pipelined streaming mode holds tready=1
+                    // during frame input, so this is a defensive check.
                     if (frame_sample_valid) begin
                         // Pack real sample with zero imaginary
                         // TDATA format: [31:16]=real, [15:0]=imag
                         data_in_tdata <= {frame_sample, 16'd0};
                         data_in_tvalid <= 1'b1;
                         
-                        if (sample_counter == 10'd511) begin
-                            // Last sample
-                            data_in_tlast <= 1'b1;
-                            data_in_tvalid <= 1'b1;
-                            frame_consumed <= 1'b1;
-                            sample_counter <= 10'd0;
-                            state <= STATE_WAIT_OUTPUT;
-                        end else begin
-                            data_in_tlast <= 1'b0;
-                            sample_counter <= sample_counter + 10'd1;
+                        if (data_in_tready) begin
+                            if (sample_counter == 10'd511) begin
+                                // Last sample accepted
+                                data_in_tlast <= 1'b1;
+                                frame_consumed <= 1'b1;
+                                sample_counter <= 10'd0;
+                                state <= STATE_WAIT_OUTPUT;
+                            end else begin
+                                data_in_tlast <= 1'b0;
+                                sample_counter <= sample_counter + 10'd1;
+                            end
                         end
                     end else begin
                         data_in_tvalid <= 1'b0;

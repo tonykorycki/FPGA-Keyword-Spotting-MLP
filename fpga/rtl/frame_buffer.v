@@ -32,6 +32,7 @@ module frame_buffer (
     reg read_state;
     reg [9:0] read_ptr;   // Pointer for serial readout
     reg [8:0] read_count; // Count samples read (0-511)
+    reg read_done;        // Prevents re-trigger while frame_ready is level-high
 
     // Write control logic with synchronous reset
     always @(posedge clk) begin
@@ -90,15 +91,22 @@ module frame_buffer (
             read_count <= 9'd0;
             frame_sample <= 16'd0;
             frame_sample_valid <= 1'b0;
+            read_done <= 1'b0;
         end else begin
             case (read_state)
                 READ_IDLE: begin
                     frame_sample_valid <= 1'b0;
-                    if (frame_ready) begin
+                    // Only trigger once per frame_ready assertion
+                    if (frame_ready && !read_done) begin
                         // Start streaming out frame
                         read_ptr <= read_base;
                         read_count <= 9'd0;
                         read_state <= READ_STREAM;
+                        read_done <= 1'b1;
+                    end
+                    // Clear guard after frame_ready deasserts (frame consumed)
+                    if (!frame_ready) begin
+                        read_done <= 1'b0;
                     end
                 end
                 
