@@ -138,8 +138,7 @@ module inference #(
     reg              mac_valid;            // Pipeline stage valid flag
     
     // Multiply (combinational) - uses pipelined values
-    // Force DSP slice usage for fast, resource-efficient multiplication
-    (* use_dsp = "yes" *) assign mac_product = weight_pipe * activation_pipe;
+    assign mac_product = weight_pipe * activation_pipe;
     
     //=========================================================================
     // State Machine - Updated for BRAM pipeline

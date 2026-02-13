@@ -103,15 +103,15 @@ set_property IOSTANDARD LVCMOS33 [get_ports led16_b]
 # Pmod Header JA - I2S Microphone Interface (SPH0645)
 # Directly on FPGA side (directly on JA Pmod connector)
 #==============================================================================
-# JA1 (Pin 1): BCLK output to mic
+# JA1 (Pin 1): BCLK output to mic (matches fpga/constraints/i2s_test.xdc)
 set_property PACKAGE_PIN J1 [get_ports i2s_bclk]					
 set_property IOSTANDARD LVCMOS33 [get_ports i2s_bclk]
-# JA2 (Pin 2): LRCLK (WS) output to mic  
-set_property PACKAGE_PIN L2 [get_ports i2s_lrclk]					
-set_property IOSTANDARD LVCMOS33 [get_ports i2s_lrclk]
-# JA3 (Pin 3): Data input from mic
-set_property PACKAGE_PIN J2 [get_ports i2s_dout]					
+# JA2 (Pin 2): DOUT input from mic
+set_property PACKAGE_PIN L2 [get_ports i2s_dout]					
 set_property IOSTANDARD LVCMOS33 [get_ports i2s_dout]
+# JA3 (Pin 3): LRCLK (WS) output to mic
+set_property PACKAGE_PIN J2 [get_ports i2s_lrclk]					
+set_property IOSTANDARD LVCMOS33 [get_ports i2s_lrclk]
 
 #==============================================================================
 # Configuration options

@@ -5,7 +5,7 @@
 // Date: November 14, 2025
 
 module i2s_rx (
-    input wire clk,                  // System clock (100 MHz)
+    input wire clk,                  // System clock (50 MHz per basys3.xdc)
     input wire rst_n,                // Active low reset
     
     // I2S Interface (to SPH0645)
@@ -22,7 +22,7 @@ module i2s_rx (
     // Clock Generation for 16 kHz Sample Rate
     //=========================================================================
     // BCLK = 16kHz * 64 = 1.024 MHz (32 bits per channel, 2 channels)
-    // From 100MHz: divide by 98 gives ~1.02 MHz
+    // From 50MHz: divide-by-49 half-period gives ~1.02 MHz BCLK
     
     reg [6:0] bclk_div;
     reg bclk_reg;
@@ -37,7 +37,7 @@ module i2s_rx (
             lrclk_reg <= 1'b0;
         end else begin
             // Generate BCLK (~1 MHz)
-            if (bclk_div >= 7'd48) begin
+            if (bclk_div >= 7'd24) begin
                 bclk_div <= 7'd0;
                 bclk_reg <= ~bclk_reg;
                 
