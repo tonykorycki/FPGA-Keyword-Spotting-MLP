@@ -30,11 +30,10 @@ module fft_core (
     // State Machine
     //=========================================================================
     localparam STATE_IDLE        = 3'd0;
-    localparam STATE_CONFIG      = 3'd1;
-    localparam STATE_STREAM_IN   = 3'd2;
-    localparam STATE_WAIT_OUTPUT = 3'd3;
-    localparam STATE_COLLECT     = 3'd4;
-    localparam STATE_DONE        = 3'd5;
+    localparam STATE_STREAM_IN   = 3'd1;
+    localparam STATE_WAIT_OUTPUT = 3'd2;
+    localparam STATE_COLLECT     = 3'd3;
+    localparam STATE_DONE        = 3'd4;
     
     reg [2:0] state;
     reg [9:0] sample_counter;  // 0-511 for input, 0-511 for output
@@ -47,6 +46,7 @@ module fft_core (
     reg         config_tvalid;
     wire        config_tready;
     wire [7:0]  config_tdata = 8'h01;  // Forward FFT
+    reg         config_done;
     
     // Input data channel
     reg         data_in_tvalid;
@@ -135,7 +135,8 @@ module fft_core (
         if (!rst_n) begin
             state <= STATE_IDLE;
             sample_counter <= 10'd0;
-            config_tvalid <= 1'b0;
+            config_tvalid <= 1'b1;
+            config_done <= 1'b0;
             data_in_tvalid <= 1'b0;
             data_in_tdata <= 32'd0;
             data_in_tlast <= 1'b0;
@@ -149,24 +150,29 @@ module fft_core (
             frame_consumed <= 1'b0;
             fft_done <= 1'b0;
             status_tready <= 1'b1;  // Always consume status
+
+            // Send FFT configuration once after reset.
+            if (!config_done) begin
+                if (config_tready) begin
+                    config_tvalid <= 1'b0;
+                    config_done <= 1'b1;
+                end else begin
+                    config_tvalid <= 1'b1;
+                end
+            end
             
             case (state)
                 //-------------------------------------------------------------
                 STATE_IDLE: begin
-                    if (frame_sample_valid) begin
-                        state <= STATE_CONFIG;
-                        sample_counter <= 10'd0;
-                        config_tvalid <= 1'b1;
-                    end
-                end
-                
-                //-------------------------------------------------------------
-                STATE_CONFIG: begin
-                    // Send configuration (forward FFT)
-                    if (config_tvalid && config_tready) begin
-                        config_tvalid <= 1'b0;
+                    data_in_tvalid <= 1'b0;
+                    data_in_tlast <= 1'b0;
+
+                    // Capture first sample immediately so no frame sample is lost.
+                    if (config_done && frame_sample_valid) begin
+                        data_in_tdata <= {frame_sample, 16'd0};
+                        data_in_tvalid <= 1'b1;
+                        sample_counter <= 10'd1;
                         state <= STATE_STREAM_IN;
-                        data_in_tvalid <= 1'b0;  // Wait for first valid sample
                     end
                 end
                 
@@ -182,7 +188,7 @@ module fft_core (
                         if (sample_counter == 10'd511) begin
                             // Last sample
                             data_in_tlast <= 1'b1;
-                            data_in_tvalid <= 1'b0;
+                            data_in_tvalid <= 1'b1;
                             frame_consumed <= 1'b1;
                             sample_counter <= 10'd0;
                             state <= STATE_WAIT_OUTPUT;
@@ -192,12 +198,14 @@ module fft_core (
                         end
                     end else begin
                         data_in_tvalid <= 1'b0;
+                        data_in_tlast <= 1'b0;
                     end
                 end
                 
                 //-------------------------------------------------------------
                 STATE_WAIT_OUTPUT: begin
                     // Wait for first output
+                    data_in_tvalid <= 1'b0;
                     data_in_tlast <= 1'b0;
                     if (data_out_tvalid) begin
                         state <= STATE_COLLECT;

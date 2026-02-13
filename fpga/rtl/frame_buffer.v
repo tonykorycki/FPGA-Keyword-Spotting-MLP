@@ -41,8 +41,6 @@ module frame_buffer (
             processing <= 1'b0;
             buffer_filled <= 1'b0;
         end else begin
-            // Reset frame_ready pulse
-            frame_ready <= 1'b0;
             
             // If sample is valid, store it and advance pointer
             if (sample_valid) begin
@@ -54,7 +52,7 @@ module frame_buffer (
                 // Condition: lower 8 bits = 255, AND (ptr >= 511 OR buffer already filled)
                 if (!processing && (write_ptr[7:0] == 8'd255) && 
                     (write_ptr >= 10'd511 || buffer_filled)) begin
-                    frame_ready <= 1'b1;
+                    frame_ready <= 1'b1;  // Set high and keep high
                     processing <= 1'b1;
                     buffer_filled <= 1'b1;  // Mark as filled after first frame
                 end
@@ -66,9 +64,10 @@ module frame_buffer (
                     write_ptr <= write_ptr + 10'd1;
             end
             
-            // Reset processing flag when frame is consumed
+            // Reset processing flag and frame_ready when frame is consumed
             if (processing && frame_consumed) begin
                 processing <= 1'b0;
+                frame_ready <= 1'b0;  // Clear when consumed
             end
         end
     end
