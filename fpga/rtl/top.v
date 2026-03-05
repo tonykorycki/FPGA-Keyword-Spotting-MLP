@@ -34,7 +34,7 @@ module top (
 
     // Reset synchronization
     reg [2:0] reset_sync;
-    wire rst_n;
+    (* mark_debug = "true" *) wire rst_n;
 
     always @(posedge clk) begin
         reset_sync <= {reset_sync[1:0], ~btnC};
@@ -60,7 +60,7 @@ module top (
     (* mark_debug = "true" *) wire        frame_ready;
     (* mark_debug = "true" *) wire [15:0] frame_sample;
     (* mark_debug = "true" *) wire        frame_sample_valid;
-    wire                                   frame_consumed;
+    (* mark_debug = "true" *) wire        frame_consumed;
 
     frame_buffer fb (
         .clk(clk),
@@ -76,7 +76,7 @@ module top (
     // FFT Core - Xilinx FFT IP Wrapper (serial input)
     (* mark_debug = "true" *) wire         fft_done;
     wire [8223:0]                      fft_bins_packed;  // 257 bins x 32 bits (real+imag)
-    wire                               fft_consumed;     // Handshake from feature extractor
+    (* mark_debug = "true" *) wire       fft_consumed;     // Handshake from feature extractor
 
     fft_core fft (
         .clk(clk),
