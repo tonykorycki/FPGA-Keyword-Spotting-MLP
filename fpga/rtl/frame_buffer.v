@@ -21,8 +21,8 @@ module frame_buffer (
 
     // Internal registers - BRAM-friendly with serial access
     (* ram_style = "block" *) reg [15:0] buffer [0:FRAME_SIZE*2-1]; // Double buffer (1024 samples)
-    reg [9:0] write_ptr;  // Pointer to current write position (0-1023)
-    reg processing;       // Flag indicating if frame is being processed
+    (* mark_debug = "true" *) reg [9:0] write_ptr;  // Pointer to current write position (0-1023)
+    (* mark_debug = "true" *) reg processing;       // Flag indicating if frame is being processed
     reg buffer_filled;    // Set after first 512 samples collected
     
     // Serialization state machine
@@ -32,7 +32,7 @@ module frame_buffer (
     reg read_state;
     reg [9:0] read_ptr;   // Pointer for serial readout
     reg [8:0] read_count; // Count samples read (0-511)
-    reg read_done;        // Prevents re-trigger while frame_ready is level-high
+    (* mark_debug = "true" *) reg read_done;        // Prevents re-trigger while frame_ready is level-high
 
     // Write control logic with synchronous reset
     always @(posedge clk) begin

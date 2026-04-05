@@ -35,8 +35,8 @@ module fft_core (
     localparam STATE_COLLECT     = 3'd3;
     localparam STATE_DONE        = 3'd4;
     
-    reg [2:0] state;
-    reg [9:0] sample_counter;  // 0-511 for input, 0-511 for output
+    (* mark_debug = "true" *) reg [2:0] state;
+    (* mark_debug = "true" *) reg [9:0] sample_counter;  // 0-511 for input, 0-511 for output
     
     //=========================================================================
     // FFT IP AXI-Stream Signals
@@ -46,11 +46,11 @@ module fft_core (
     reg         config_tvalid;
     wire        config_tready;
     wire [7:0]  config_tdata = 8'h01;  // Forward FFT
-    reg         config_done;
+    (* mark_debug = "true" *) reg         config_done;
     
     // Input data channel
     reg         data_in_tvalid;
-    wire        data_in_tready;
+    (* mark_debug = "true" *) wire        data_in_tready;
     reg [31:0]  data_in_tdata;
     reg         data_in_tlast;
     
@@ -67,12 +67,12 @@ module fft_core (
     wire [7:0]  status_tdata;
     
     // Event signals (for debugging)
-    wire event_frame_started;
-    wire event_tlast_unexpected;
-    wire event_tlast_missing;
-    wire event_status_channel_halt;
-    wire event_data_in_channel_halt;
-    wire event_data_out_channel_halt;
+    (* mark_debug = "true" *) wire event_frame_started;
+    (* mark_debug = "true" *) wire event_tlast_unexpected;
+    (* mark_debug = "true" *) wire event_tlast_missing;
+    (* mark_debug = "true" *) wire event_status_channel_halt;
+    (* mark_debug = "true" *) wire event_data_in_channel_halt;
+    (* mark_debug = "true" *) wire event_data_out_channel_halt;
     
     //=========================================================================
     // Xilinx FFT IP Instantiation
@@ -182,10 +182,20 @@ module fft_core (
                     // AXI-Stream: advance only when tready accepts the sample.
                     // Xilinx FFT pipelined streaming mode holds tready=1
                     // during frame input, so this is a defensive check.
+                    //
+                    // AXI-Stream rule: once tvalid is asserted tdata must remain
+                    // stable until tready acknowledges.  Only capture a new sample
+                    // when the previous one has been accepted (tready=1) or when
+                    // tvalid is not yet asserted (start of burst).
+                    // NOTE: frame_buffer streams continuously without backpressure,
+                    // so any cycle where we hold tdata will cause one lost sample.
+                    // With Xilinx pipelined FFT (tready=1 throughout input) this
+                    // never occurs in practice.
                     if (frame_sample_valid) begin
                         // Pack real sample with zero imaginary
                         // TDATA format: [31:16]=real, [15:0]=imag
-                        data_in_tdata <= {frame_sample, 16'd0};
+                        if (!data_in_tvalid || data_in_tready)
+                            data_in_tdata <= {frame_sample, 16'd0};
                         data_in_tvalid <= 1'b1;
                         
                         if (data_in_tready) begin
