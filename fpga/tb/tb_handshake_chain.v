@@ -51,6 +51,9 @@ module tb_handshake_chain;
     wire        frame_consumed;   // fft_core -> frame_buffer
     wire [8223:0] fft_bins_packed;
     wire        fft_done;
+    wire        fft_ready;        // fft_core -> frame_buffer (stream gate)
+    wire        fft_data_ready;   // fft_core -> frame_buffer (backpressure)
+    wire        re_stream_req;    // fft_core -> frame_buffer (recovery)
 
     // feature_extractor outputs
     wire        fft_consumed;     // feature_extractor -> (not connected to fft_core -- ok)
@@ -67,6 +70,9 @@ module tb_handshake_chain;
         .audio_sample     (audio_sample),
         .sample_valid     (sample_valid),
         .frame_consumed   (frame_consumed),
+        .fft_ready        (fft_ready),
+        .downstream_ready (fft_data_ready),
+        .re_stream_req    (re_stream_req),
         .frame_ready      (frame_ready),
         .frame_sample     (frame_sample),
         .frame_sample_valid (frame_sample_valid)
@@ -79,7 +85,10 @@ module tb_handshake_chain;
         .frame_sample_valid (frame_sample_valid),
         .frame_consumed   (frame_consumed),
         .fft_bins_packed  (fft_bins_packed),
-        .fft_done         (fft_done)
+        .fft_done         (fft_done),
+        .fft_ready        (fft_ready),
+        .fft_data_ready   (fft_data_ready),
+        .re_stream_req    (re_stream_req)
     );
 
     feature_extractor feat_ext (
@@ -107,18 +116,22 @@ module tb_handshake_chain;
     integer frame_consumed_rise_count;
     integer fft_done_rise_count;
     integer features_valid_rise_count;
+    integer re_stream_rise_count;
 
     reg frame_ready_prev, frame_consumed_prev, fft_done_prev, features_valid_prev;
+    reg re_stream_prev;
 
     initial begin
         frame_ready_rise_count     = 0;
         frame_consumed_rise_count  = 0;
         fft_done_rise_count        = 0;
         features_valid_rise_count  = 0;
+        re_stream_rise_count       = 0;
         frame_ready_prev           = 0;
         frame_consumed_prev        = 0;
         fft_done_prev              = 0;
         features_valid_prev        = 0;
+        re_stream_prev             = 0;
     end
 
     always @(posedge clk) begin
@@ -151,10 +164,31 @@ module tb_handshake_chain;
                      $signed(features_packed[807:800]));
         end
 
+        if (re_stream_req && !re_stream_prev) begin
+            re_stream_rise_count = re_stream_rise_count + 1;
+            $display("[%8t ns] re_stream_req PULSE     (count=%0d)", $time, re_stream_rise_count);
+        end
+
         frame_ready_prev      <= frame_ready;
         frame_consumed_prev   <= frame_consumed;
         fft_done_prev         <= fft_done;
         features_valid_prev   <= features_valid;
+        re_stream_prev        <= re_stream_req;
+    end
+
+    //==========================================================================
+    // fft_ready monitoring — verify frame_buffer waits for it
+    //==========================================================================
+    // Track whether frame_sample_valid ever fires while fft_ready is LOW.
+    // This would indicate the synchronization gate is not working.
+    integer stream_before_ready_count;
+    initial stream_before_ready_count = 0;
+
+    always @(posedge clk) begin
+        if (frame_sample_valid && !fft_ready && fft.state == 3'd0) begin
+            // frame_buffer streaming while fft_core is in IDLE but not ready
+            stream_before_ready_count = stream_before_ready_count + 1;
+        end
     end
 
     //==========================================================================
@@ -264,6 +298,24 @@ module tb_handshake_chain;
             $display("[FAIL] Deadlock: frame_ready=%0d >> frame_consumed=%0d (delta > 1)",
                      frame_ready_rise_count, frame_consumed_rise_count);
             fail_count = fail_count + 1;
+        end
+
+        // Verify fft_ready gate: frame_buffer should never stream while fft not ready
+        if (stream_before_ready_count == 0)
+            $display("[PASS] frame_buffer never streamed while fft_core not ready");
+        else begin
+            $display("[FAIL] frame_buffer streamed %0d cycles while fft_core in IDLE but not ready",
+                     stream_before_ready_count);
+            fail_count = fail_count + 1;
+        end
+
+        // Verify re_stream_req did not fire (normal operation should not need it)
+        if (re_stream_rise_count == 0)
+            $display("[PASS] re_stream_req never fired (no recovery needed)");
+        else begin
+            $display("[INFO] re_stream_req fired %0d times (recovery was triggered)",
+                     re_stream_rise_count);
+            // Not a fail — recovery firing is OK, just informational
         end
 
         $display("----------------------------------------");

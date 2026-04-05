@@ -68,6 +68,9 @@ module top (
         .audio_sample(audio_sample),
         .sample_valid(sample_valid),
         .frame_consumed(frame_consumed),
+        .fft_ready(fft_ready),
+        .downstream_ready(fft_data_ready),
+        .re_stream_req(re_stream_req),
         .frame_ready(frame_ready),
         .frame_sample(frame_sample),
         .frame_sample_valid(frame_sample_valid)
@@ -75,6 +78,9 @@ module top (
 
     // FFT Core - Xilinx FFT IP Wrapper (serial input)
     (* mark_debug = "true" *) wire         fft_done;
+    (* mark_debug = "true" *) wire         fft_ready;        // fft_core ready to accept a stream
+    wire                               fft_data_ready;   // FFT IP backpressure (tready passthrough)
+    (* mark_debug = "true" *) wire     re_stream_req;    // Recovery: fft_core missed stream
     wire [8223:0]                      fft_bins_packed;  // 257 bins x 32 bits (real+imag)
     (* mark_debug = "true" *) wire       fft_consumed;     // Handshake from feature extractor
 
@@ -85,7 +91,10 @@ module top (
         .frame_sample_valid(frame_sample_valid),
         .frame_consumed(frame_consumed),
         .fft_bins_packed(fft_bins_packed),
-        .fft_done(fft_done)
+        .fft_done(fft_done),
+        .fft_ready(fft_ready),
+        .fft_data_ready(fft_data_ready),
+        .re_stream_req(re_stream_req)
     );
 
     // Feature Extractor

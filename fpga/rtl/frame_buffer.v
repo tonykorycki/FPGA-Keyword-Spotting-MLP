@@ -10,6 +10,9 @@ module frame_buffer (
     input wire [15:0] audio_sample,  // Input audio sample
     input wire sample_valid,         // Sample valid signal
     input wire frame_consumed,       // Signal that downstream has consumed the frame
+    input wire fft_ready,            // Downstream (fft_core) ready to accept a stream
+    input wire downstream_ready,     // Backpressure: downstream accepted current sample
+    input wire re_stream_req,        // Recovery: fft_core lost stream, re-run READ_STREAM
     output reg frame_ready,          // Frame ready signal (pulses when new frame available)
     output reg [15:0] frame_sample,  // Serial output: one sample per cycle
     output reg frame_sample_valid    // Valid signal for serial output
@@ -96,13 +99,20 @@ module frame_buffer (
             case (read_state)
                 READ_IDLE: begin
                     frame_sample_valid <= 1'b0;
-                    // Only trigger once per frame_ready assertion
-                    if (frame_ready && !read_done) begin
+                    // Only trigger once per frame_ready assertion, AND
+                    // only when downstream (fft_core) is ready to accept
+                    if (frame_ready && !read_done && fft_ready) begin
                         // Start streaming out frame
                         read_ptr <= read_base;
                         read_count <= 9'd0;
                         read_state <= READ_STREAM;
                         read_done <= 1'b1;
+                    end
+                    // Recovery: fft_core missed the stream — allow re-trigger
+                    if (re_stream_req && read_done && frame_ready) begin
+                        read_done <= 1'b0;
+                        // Next cycle: read_done=0, frame_ready=1 → normal re-trigger
+                        // (will wait for fft_ready before actually starting)
                     end
                     // Clear guard after frame_ready deasserts (frame consumed)
                     if (!frame_ready) begin
@@ -111,22 +121,27 @@ module frame_buffer (
                 end
                 
                 READ_STREAM: begin
-                    // Output one sample per cycle
-                    frame_sample <= buffer[read_ptr];
-                    frame_sample_valid <= 1'b1;
-                    
-                    // Advance read pointer with wraparound
-                    if (read_ptr >= (FRAME_SIZE*2 - 1))
-                        read_ptr <= 10'd0;
-                    else
-                        read_ptr <= read_ptr + 10'd1;
-                    
-                    // Check if done
-                    if (read_count == FRAME_SIZE - 1) begin
-                        read_state <= READ_IDLE;
-                    end else begin
-                        read_count <= read_count + 9'd1;
+                    // Output one sample per cycle, respecting backpressure.
+                    // Only present new data and advance when downstream accepts
+                    // (downstream_ready HIGH) or when we haven't asserted valid yet.
+                    if (!frame_sample_valid || downstream_ready) begin
+                        frame_sample <= buffer[read_ptr];
+                        frame_sample_valid <= 1'b1;
+
+                        // Advance read pointer with wraparound
+                        if (read_ptr >= (FRAME_SIZE*2 - 1))
+                            read_ptr <= 10'd0;
+                        else
+                            read_ptr <= read_ptr + 10'd1;
+
+                        // Check if done
+                        if (read_count == FRAME_SIZE - 1) begin
+                            read_state <= READ_IDLE;
+                        end else begin
+                            read_count <= read_count + 9'd1;
+                        end
                     end
+                    // else: hold frame_sample and frame_sample_valid stable (backpressure)
                 end
             endcase
         end

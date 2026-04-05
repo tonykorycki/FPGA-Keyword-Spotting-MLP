@@ -23,7 +23,14 @@ module fft_core (
     
     // Output interface - packed FFT bins
     output reg [8223:0]  fft_bins_packed,        // 257 bins × 32 bits (real+imag)
-    output reg           fft_done                // FFT output ready
+    output reg           fft_done,               // FFT output ready
+
+    // Handshake - tells frame_buffer we're ready to receive a stream
+    output wire          fft_ready,
+    // Backpressure - HIGH when FFT IP can accept data this cycle
+    output wire          fft_data_ready,
+    // Recovery - pulse HIGH if stream was lost mid-frame (safety net)
+    output reg           re_stream_req
 );
 
     //=========================================================================
@@ -37,6 +44,12 @@ module fft_core (
     
     (* mark_debug = "true" *) reg [2:0] state;
     (* mark_debug = "true" *) reg [9:0] sample_counter;  // 0-511 for input, 0-511 for output
+
+    // fft_ready: HIGH when idle and genuinely able to accept a new frame
+    assign fft_ready = (state == STATE_IDLE) && config_done && data_in_tready;
+
+    // fft_data_ready: pass through IP's tready so frame_buffer can respect backpressure
+    assign fft_data_ready = data_in_tready;
     
     //=========================================================================
     // FFT IP AXI-Stream Signals
@@ -144,11 +157,13 @@ module fft_core (
             status_tready <= 1'b1;  // Always ready for status
             frame_consumed <= 1'b0;
             fft_done <= 1'b0;
-            
+            re_stream_req <= 1'b0;
+
         end else begin
             // Default values
             frame_consumed <= 1'b0;
             fft_done <= 1'b0;
+            re_stream_req <= 1'b0;
             status_tready <= 1'b1;  // Always consume status
 
             // Send FFT configuration once after reset.
@@ -180,24 +195,15 @@ module fft_core (
                 STATE_STREAM_IN: begin
                     // Stream 512 samples into FFT (serial input)
                     // AXI-Stream: advance only when tready accepts the sample.
-                    // Xilinx FFT pipelined streaming mode holds tready=1
-                    // during frame input, so this is a defensive check.
-                    //
-                    // AXI-Stream rule: once tvalid is asserted tdata must remain
-                    // stable until tready acknowledges.  Only capture a new sample
-                    // when the previous one has been accepted (tready=1) or when
-                    // tvalid is not yet asserted (start of burst).
-                    // NOTE: frame_buffer streams continuously without backpressure,
-                    // so any cycle where we hold tdata will cause one lost sample.
-                    // With Xilinx pipelined FFT (tready=1 throughout input) this
-                    // never occurs in practice.
+                    // frame_buffer now respects backpressure via downstream_ready,
+                    // so frame_sample_valid stays asserted until we accept each sample.
                     if (frame_sample_valid) begin
                         // Pack real sample with zero imaginary
                         // TDATA format: [31:16]=real, [15:0]=imag
                         if (!data_in_tvalid || data_in_tready)
                             data_in_tdata <= {frame_sample, 16'd0};
                         data_in_tvalid <= 1'b1;
-                        
+
                         if (data_in_tready) begin
                             if (sample_counter == 10'd511) begin
                                 // Last sample accepted
@@ -210,9 +216,23 @@ module fft_core (
                                 sample_counter <= sample_counter + 10'd1;
                             end
                         end
-                    end else begin
+                    end else if (sample_counter > 10'd0) begin
+                        // Safety net: frame_sample_valid dropped mid-frame.
+                        // This should not happen with the fft_ready gate + backpressure,
+                        // but if it does, return to IDLE and request a re-stream rather
+                        // than deadlocking. Deassert tvalid to avoid AXI protocol error.
                         data_in_tvalid <= 1'b0;
-                        data_in_tlast <= 1'b0;
+                        data_in_tlast  <= 1'b0;
+                        data_in_tdata  <= 32'd0;
+                        sample_counter <= 10'd0;
+                        state          <= STATE_IDLE;
+                        re_stream_req  <= 1'b1;
+                    end else begin
+                        // sample_counter == 0 and no valid — shouldn't reach here,
+                        // but return to IDLE cleanly
+                        data_in_tvalid <= 1'b0;
+                        data_in_tlast  <= 1'b0;
+                        state          <= STATE_IDLE;
                     end
                 end
                 
