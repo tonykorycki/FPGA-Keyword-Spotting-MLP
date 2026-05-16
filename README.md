@@ -2,7 +2,7 @@
 
 A complete keyword spotting system built from scratch — from recording training data to running a quantized neural network on an FPGA in real time.
 
-The system listens for the word "start" through an I2S microphone, runs the audio through a 512-point FFT and feature extraction pipeline, and classifies each frame using an INT8-quantized neural network — all in hardware, with no CPU or OS.
+The system listens for the word "start" through an I2S microphone, runs the audio through a 512-point FFT and feature extraction pipeline, and classifies each frame using an INT8-quantized neural network.
 
 **Hardware:** Digilent Basys 3 (Artix-7 xc7a35tcpg236-1)
 
@@ -10,11 +10,9 @@ The system listens for the word "start" through an I2S microphone, runs the audi
 
 ## What's in here
 
-The project covers the full stack:
+**Python side:** data collection, spectral feature extraction, model training (Keras), INT8 quantization, and exporting weights as Verilog memory init files.
 
-**Python side** — data collection, spectral feature extraction, model training (Keras), INT8 quantization, and exporting weights as Verilog memory init files.
-
-**FPGA side** — a complete RTL audio processing pipeline:
+**FPGA side:** a complete RTL audio processing pipeline:
 
 ```
 I2S Mic → Frame Buffer → 512-pt FFT → Feature Extraction → MLP Inference → LED Output
@@ -93,6 +91,3 @@ vvp sim/tb.vvp
 
 ---
 
-## License
-
-MIT — see [LICENSE](LICENSE).
