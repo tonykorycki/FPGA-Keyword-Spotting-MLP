@@ -19,8 +19,8 @@ I2S Mic → Frame Buffer → 512-pt FFT → Feature Extraction → MLP Inference
 ```
 
 Each stage streams data serially to the next using a handshake interface, so the pipeline runs continuously without stalling. A 31-frame sliding window averages features over ~1 second before inference to suppress noise.
+For more information on the hardware implementation, read [docs/architecture.md](docs/architecture.md)
 
-For more information on the hardware implementation, read [docs/architecture.md]
 ---
 
 ## The neural network
