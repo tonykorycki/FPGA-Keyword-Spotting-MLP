@@ -1,309 +1,118 @@
-# Architecture Overview
+# System Architecture
 
-## System Architecture
-
-The FPGA-based Keyword Spotting (KWS) system implements a complete audio processing pipeline on FPGA hardware.
-
-**Pipeline**: Audio Input (I2S) → Frame Buffer → FFT → Feature Extraction → Inference → Output
-
-### Current Status
-
-**Completed:**
-- Neural network inference engine (Verilog)
-- Python training and quantization pipeline
-- INT8 quantized 3-layer MLP model
-- Test vector generation and verification
-
-**In Progress:**
-- Audio preprocessing modules (I2S, FFT, feature extraction)
-- System integration
-- Hardware testing on Basys 3
-
-## Audio Processing Pipeline (Planned)
-
-1. **Audio Acquisition** (i2s_rx.v - TODO)
-   - I2S MEMS microphone interface
-   - 16 kHz sample rate, 16-bit samples
-   
-2. **Frame Buffering** (frame_buffer.v - TODO)
-   - Windowing into 32ms frames (512 samples @ 16kHz)
-   - 50% overlap between consecutive frames
-   
-3. **Spectral Analysis** (fft_core.v - TODO)
-   - 512-point FFT
-   - Complex → magnitude conversion
-   
-4. **Feature Extraction** (feature_extractor.v - TODO)
-   - Log-mel spectrogram computation
-   - 257 feature coefficients extracted
-   - INT8 quantization for inference
-   
-5. **Neural Network Inference** (inference.v - COMPLETE)
-   - 3-layer MLP: 257 → 32 → 16 → 2
-   - INT8 weights, INT32 biases
-   - ReLU activation on hidden layers
-   
-6. **Output Control** (output_control.v - TODO)
-   - LED visualization
-   - Detection flag output
-
-## Neural Network Architecture
-
-### Layer Configuration
-
-| Layer    | Input | Output | Weights      | Activation | Quantization |
-|----------|-------|--------|--------------|------------|--------------|
-| Layer 0  | 257   | 32     | 257×32=8,224 | ReLU       | INT8         |
-| Layer 1  | 32    | 16     | 32×16=512    | ReLU       | INT8         |
-| Layer 2  | 16    | 2      | 16×2=32      | None       | INT8         |
-| **Total** |      |        | **8,768 weights** |        |              |
-
-### Quantization Scheme
-
-- **Weights:** INT8 (-127 to 127), stored in block RAM
-- **Biases:** INT32, full precision
-- **Activations:** INT8 after ReLU clipping
-- **Accumulator:** INT32 for intermediate sums
-- **Requantization:** Scale factors applied post-accumulation to prevent overflow
-
-### Inference Dataflow
+## Pipeline Overview
 
 ```
-Input [257×INT8] → Layer 0 MAC → Requantize → ReLU → [32×INT8]
-                                                          ↓
-                         Layer 2 MAC → Requantize → [2×INT8] logits
-                              ↑
-                [16×INT8] ← ReLU ← Requantize ← MAC ← Layer 1
+I2S Mic
+  └─ i2s_rx.v              16-bit samples @ 16 kHz
+       └─ frame_buffer.v   512-sample frames, 50% overlap, serial output
+            └─ fft_core_v2.v   Xilinx xfft_0 (512-pt pipelined FFT), serial bin output
+                 └─ feature_extractor_v2.v   magnitude → log2_approx → INT8 (257 bins)
+                      └─ feature_averager.v  31-frame sliding window (~1 s)
+                           └─ inference.v    3-layer MLP (257→32→16→2), INT8 weights
+                                └─ top.v     LED output, ILA debug
 ```
 
-### MAC (Multiply-Accumulate) Operation
+All inter-module data flows serially (one sample or bin per clock cycle) over a handshake interface (`data`, `valid`, `ready`, `last`). This avoids wide parallel buses and makes BRAM-based buffering tractable on the Basys 3.
 
-Sequential processing, one operation per cycle:
-1. Load weight[i] and activation[i]
-2. Multiply: product = weight × activation (16-bit result)
-3. Accumulate: sum += product (32-bit accumulator)
-4. Repeat for all inputs
-5. Add bias
-6. Requantize to INT8
-7. Apply ReLU (if hidden layer)
+---
 
-## Hardware Implementation
+## Module Details
 
-### Current Resource Utilization (Inference Only)
+### i2s_rx.v — I2S Receiver
 
-Based on Vivado synthesis for Basys 3 (xc7a35tcpg236-1):
+Captures 16-bit audio samples from a MEMS I2S microphone at 16 kHz. Outputs `audio_sample[15:0]` and `sample_valid` at the sample rate.
 
-| Resource      | Used  | Available | Utilization |
-|---------------|-------|-----------|-------------|
-| LUTs          | 3,502 | 20,800    | 16.84%      |
-| Flip-Flops    | 2,686 | 41,600    | 6.46%       |
-| F7 Muxes      | 1,094 | 16,300    | 6.71%       |
-| F8 Muxes      | 526   | 8,150     | 6.45%       |
-| BRAMs         | 0     | 50        | 0%*         |
-| DSPs          | 0     | 90        | 0%**        |
+### frame_buffer.v — Audio Windowing
 
-*Weights stored in distributed RAM (FFs) due to async reset  
-**MAC implemented in fabric logic
+Accumulates 512 samples (32 ms at 16 kHz) and then streams them out one per clock cycle, 50% overlap between consecutive frames. Outputs `frame_sample[15:0]` + `frame_sample_valid` + `frame_consumed` handshake.
 
-**Resource Headroom:** 80%+ resources available for audio pipeline
-**Resource Headroom:** 80%+ resources available for audio pipeline
+### fft_core_v2.v — 512-Point FFT
 
-### Timing Analysis
+Wraps the Xilinx xfft_0 IP core (pipelined streaming FFT, Real Time throttle scheme). Accepts the serial frame from `frame_buffer`, feeds xfft_0, and streams output bins serially: `fft_bin_data[31:0]` ([31:16]=real, [15:0]=imag), `fft_bin_valid`, `fft_bin_last`.
 
-**Inference Latency (per sample):**
-- Layer 0: 257 MAC cycles + 1 requantize = 258 cycles
-- Layer 1: 32 MAC cycles + 1 requantize = 33 cycles  
-- Layer 2: 16 MAC cycles + 1 requantize = 17 cycles
-- Argmax: 1 cycle
-- **Total: ~309 cycles @ 100 MHz = 3.09 μs per inference**
+`data_out_tready` is held HIGH at reset so the FFT output always drains — this prevents backpressure from stalling the IP's input-side tready (the root cause of an earlier hardware deadlock).
 
-**Throughput:**
-- System clock: 100 MHz (Basys 3 onboard oscillator)
-- Inference rate: ~324k inferences/second
-- Audio frame rate: ~31 Hz (32ms frames) → 0.03k frames/second
-- **Headroom: 10,000× faster than required**
+### feature_extractor_v2.v — Spectral Features
 
-### Planned Full System Utilization
+For each of the 257 output bins (DC through Nyquist): computes magnitude via integer approximation, applies log2 approximation, and requantizes to INT8. Streams `fft_feature_data[7:0]` + `fft_feature_valid` + `fft_feature_last`.
 
-Estimated resource usage with audio pipeline:
+### feature_averager.v — Temporal Smoothing
 
-| Module              | LUTs (est.) | FFs (est.) | BRAMs | DSPs |
-|---------------------|-------------|------------|-------|------|
-| Inference (actual)  | 3,502       | 2,686      | 0     | 0    |
-| I2S Receiver        | ~100        | ~50        | 0     | 0    |
-| Frame Buffer        | ~200        | ~512       | 2     | 0    |
-| FFT Core            | ~2,000      | ~1,000     | 4     | 4    |
-| Feature Extractor   | ~500        | ~300       | 2     | 2    |
-| Output Control      | ~50         | ~30        | 0     | 0    |
-| **Estimated Total** | **~6,400**  | **~4,600** | **8** | **6** |
-| **% of Basys 3**    | **~31%**    | **~11%**   | **16%** | **7%** |
+Maintains a 31-frame sliding window ring buffer. Averages each of the 257 feature bins across the window (divide-by-32 via right shift, ~3.2% gain error — acceptable). Outputs `averaged_features[7:0]` + `averaged_valid`.
 
-**Conclusion:** Design fits comfortably on Basys 3 with room for expansion.
+The ring buffer lives in distributed RAM (LUTs) rather than BRAM because the access pattern (simultaneous read of oldest + write of newest per bin) requires true dual-port access that Vivado cannot infer into block RAM. This uses ~815 LUTs and is a known optimization target.
 
-## Target Hardware
+### inference.v — MLP Inference Engine
 
-**Development Board:** Digilent Basys 3
+Sequential MAC engine. Processes one multiply-accumulate per clock cycle.
 
-**FPGA:**
-- Part: Artix-7 xc7a35tcpg236-1
-- LUTs: 20,800
-- Flip-Flops: 41,600
-- Block RAM: 50 (36Kb each)
-- DSP Slices: 90
+| Layer | Input | Output | Weights | Activation |
+|-------|-------|--------|---------|------------|
+| 0 | 257 | 32 | 8,224 | ReLU |
+| 1 | 32 | 16 | 512 | ReLU |
+| 2 | 16 | 2 | 32 | None (logits) |
 
-**Peripherals:**
-- Clock: 100 MHz onboard oscillator
-- LEDs: 16 for status/debug
-- Switches: For configuration
-- I2S Microphone: External (ICS-43434 or similar)
+Weights and biases stored in block RAM, loaded from `.mem` files at bitstream load time. Output: `prediction` (1-bit), `inference_done`.
 
-## Module Interfaces
+Inference latency: ~309 cycles @ 50 MHz = ~6 μs. Frame period: 32 ms. Headroom: >5,000×.
 
-### Inference Engine (`inference.v`)
+### top.v — Integration
 
-**Status:** Complete
+Connects all modules, instantiates ILA debug core, drives Basys 3 LEDs on detection event. Reset is synchronous throughout.
 
-```verilog
-module inference (
-    input  wire        clk,
-    input  wire        rst_n,
-    input  wire [7:0]  features [0:256],
-    input  wire        features_valid,
-    output reg         inference_done,
-    output reg         prediction,
-    output reg  [31:0] logits [0:1]
-);
-```
+---
 
-### Planned Module Interfaces
+## Quantization Scheme
 
-**I2S Receiver** (`i2s_rx.v` - TODO)
-```verilog
-module i2s_rx (
-    input  wire        clk,           // System clock
-    input  wire        rst_n,
-    input  wire        i2s_sck,       // I2S serial clock
-    input  wire        i2s_ws,        // I2S word select
-    input  wire        i2s_sd,        // I2S serial data
-    output reg  [15:0] sample,        // 16-bit audio sample
-    output reg         sample_valid   // New sample ready
-);
-```
+| Quantity | Format | Notes |
+|----------|--------|-------|
+| Weights | INT8 (−127 to 127) | Stored in BRAM |
+| Biases | INT32 | Full precision |
+| Activations | INT8 | ReLU clipped |
+| MAC Accumulator | INT32 | Per-layer, then requantized |
 
-**Frame Buffer** (`frame_buffer.v` - TODO)
-```verilog
-module frame_buffer (
-    input  wire        clk,
-    input  wire        rst_n,
-    input  wire [15:0] sample_in,
-    input  wire        sample_valid,
-    output reg  [15:0] frame [0:511], // 512 samples
-    output reg         frame_ready    // Frame complete
-);
-```
+Requantization scale factors are computed offline during the Python quantization step and baked into the RTL as parameters.
 
-**FFT Core** (`fft_core.v` - TODO)
-```verilog
-module fft_core (
-    input  wire        clk,
-    input  wire        rst_n,
-    input  wire [15:0] time_data [0:511],
-    input  wire        start,
-    output reg  [31:0] freq_mag [0:255],  // Magnitude spectrum
-    output reg         done
-);
-```
+---
 
-**Feature Extractor** (`feature_extractor.v` - TODO)
-```verilog
-module feature_extractor (
-    input  wire        clk,
-    input  wire        rst_n,
-    input  wire [31:0] fft_mag [0:255],
-    input  wire        start,
-    output reg  [7:0]  features [0:256],  // 257 INT8 features
-    output reg         done
-);
-```
+## Resource Utilization
 
-## Design Decisions
+**Target:** Artix-7 xc7a35tcpg236-1, Vivado 2025.1, 50 MHz
 
-### Why INT8 Quantization?
+Last implementation (design + ILA, with v1 fft/feature modules):
 
-- **Accuracy:** Minimal loss vs. float32 (~98% for both)
-- **Resources:** 4× smaller memory footprint
-- **Speed:** Integer arithmetic faster than floating-point
-- **Power:** Lower dynamic power consumption
+| Resource | Used | Available | % |
+|----------|------|-----------|---|
+| Slice LUTs | 19,010 | 20,800 | 91.4% |
+| Slice Registers | 30,595 | 41,600 | 73.6% |
+| Slices | 8,125 | 8,150 | 99.7% |
 
-### Why Sequential MAC?
+After v2 module migration (fft_core_v2 + feature_extractor_v2), the bin_real/bin_imag arrays and the 8224-bit parallel bus are eliminated (~8,261 FFs freed). New utilization pending re-synthesis.
 
-- **Area:** Single multiplier vs. 257 parallel multipliers
-- **Timing:** Easier to meet timing at 100 MHz
-- **Flexibility:** Easy to modify layer sizes
-- **Trade-off:** Latency acceptable (3 μs << 32 ms frame time)
+**Timing:** WNS +0.313 ns with ILA (passes). Without ILA: WNS +1.047 ns.
 
-### Why Distributed RAM for Weights?
+---
 
-- **Async Reset:** BRAMs don't support async reset well
-- **Access Pattern:** Random access during MAC
-- **Size:** 8,768 bytes fits in distributed RAM
-- **Trade-off:** Uses more LUTs but simplifies design
+## Clock Domain
+
+Single clock domain: 50 MHz system clock derived from Basys 3's 100 MHz oscillator via BUFG.
+
+Reset is synchronous throughout. The I2S bit clock is an input but all sampled data is re-registered on the system clock within i2s_rx.
+
+---
 
 ## Python Training Pipeline
 
-### Scripts
-
-1. **`collect_data.py`** - Record audio samples
-2. **`make_features.py`** - Extract MFCC features
-3. **`train_model.py`** - Train float32 Keras model
-4. **`quantize_model.py`** - Convert to INT8 and generate `.mem` files
-5. **`convert_test_vectors.py`** - Generate test cases
-6. **`simulate_quantized_inference.py`** - Verify quantization
-
-### Data Flow
-
 ```
-Raw Audio → MFCC Features → Train Model → Quantize → .mem Files → Verilog
-   (WAV)      (.npy)         (.h5)       (.npz)      (.mem)      (synthesis)
+Raw WAV files  →  make_features.py  →  train_model.py  →  quantize_model.py  →  .mem files
+(data/processed/)   (MFCC/log-spec)     (Keras, float32)    (INT8 weights)      (Vivado init)
 ```
 
-## References
-
-- [INFERENCE.md](../fpga/INFERENCE.md) - Detailed inference module documentation
-- [TODO.md](../fpga/rtl/TODO.md) - Audio pipeline implementation roadmap
-- [project_status.md](project_status.md) - Current development status
-| FFT Core           | 1,504  | 1,236  | 4      | 12     |
-| Feature Extraction | 578    | 425    | 2      | 8      |
-| Inference Engine   | 875    | 642    | 4      | 16     |
-| Output Control     | 124    | 108    | 0      | 0      |
-| **Total**          | **3,510** | **2,784** | **12** | **36** |
-
-### Clock Domains
-
-The system utilizes two clock domains:
-1. **Audio Clock Domain**: Derived from I2S interface (typically 2-3 MHz)
-2. **System Clock Domain**: Main processing clock (50-100 MHz)
-
-Clock domain crossing is handled with proper synchronization techniques.
-
-## Memory Organization
-
-1. **Frame Buffers**
-   - Dual-port RAM for audio samples
-   - 2 × 256 × 16 bits (8 kbit total)
-   
-2. **Model Weights**
-   - Layer 1: 32 × 64 × 8 bits (16 kbit)
-   - Layer 1 bias: 64 × 8 bits (512 bit)
-   - Layer 2: 64 × 2 × 8 bits (1 kbit)
-   - Layer 2 bias: 2 × 8 bits (16 bit)
-
-3. **Mel Filter Coefficients**
-   - 32 filters × 128 bins × 8 bits (32 kbit)
-
-## Performance Metrics
-
-- **Latency**: ~20 ms from audio input to detection output
-- **Power Consumption**: ~100 mW (estimated)
-- **Detection Accuracy**: >95% on validation set
-- **False Positive Rate**: <1% (adjustable via threshold)
+Scripts:
+- `collect_data.py` — microphone recording helper
+- `make_features.py` — spectral feature extraction (matches RTL computation)
+- `train_model.py` — Keras model training and evaluation
+- `quantize_model.py` — INT8 quantization, scale factor computation, `.mem` file export
+- `simulate_quantized_inference.py` — SW golden reference for RTL verification
+- `convert_test_vectors.py` — generates hex test vectors for the Verilog testbench
