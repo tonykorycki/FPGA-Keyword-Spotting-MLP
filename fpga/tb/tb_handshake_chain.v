@@ -2,7 +2,7 @@
 //==============================================================================
 // tb_handshake_chain.v
 //
-// Targeted handshake testbench: frame_buffer -> fft_core -> feature_extractor
+// Targeted handshake testbench: frame_buffer -> fft_core_v2 -> feature_extractor_v2
 //
 // Verifies that all handshake signals propagate correctly through the pipeline
 // WITHOUT requiring Vivado or the real xfft_0 IP.  Uses xfft_0_stub.v.
@@ -11,8 +11,8 @@
 //   iverilog -g2012 -o sim/handshake_chain.vvp \
 //       tb/tb_handshake_chain.v \
 //       rtl/frame_buffer.v \
-//       rtl/fft_core.v \
-//       rtl/feature_extractor.v \
+//       rtl/fft_core_v2.v \
+//       rtl/feature_extractor_v2.v \
 //       rtl/xfft_0_stub.v \
 //     && vvp sim/handshake_chain.vvp
 //
@@ -22,7 +22,7 @@
 // Expected output (2 frames injected):
 //   [PASS] frame_ready fired >= 2 times
 //   [PASS] frame_consumed fired >= 2 times
-//   [PASS] fft_done fired >= 2 times
+//   [PASS] fft_bin_last fired >= 2 times
 //   [PASS] features_valid fired >= 2 times
 //==============================================================================
 
@@ -42,21 +42,22 @@ module tb_handshake_chain;
     reg  [15:0] audio_sample;
     reg         sample_valid;
 
-    // frame_buffer outputs to fft_core
+    // frame_buffer outputs to fft_core_v2
     wire        frame_ready;
     wire [15:0] frame_sample;
     wire        frame_sample_valid;
 
-    // fft_core outputs
-    wire        frame_consumed;   // fft_core -> frame_buffer
-    wire [8223:0] fft_bins_packed;
-    wire        fft_done;
-    wire        fft_ready;        // fft_core -> frame_buffer (stream gate)
-    wire        fft_data_ready;   // fft_core -> frame_buffer (backpressure)
-    wire        re_stream_req;    // fft_core -> frame_buffer (recovery)
+    // fft_core_v2 outputs
+    wire        frame_consumed;       // fft_core_v2 -> frame_buffer
+    wire [31:0] fft_bin_data;         // serial bin output [31:16]=real, [15:0]=imag
+    wire        fft_bin_valid;        // bin data valid
+    wire        fft_bin_last;         // last bin (bin 256) — replaces fft_done
+    wire        fft_ready;            // fft_core_v2 -> frame_buffer (stream gate)
+    wire        fft_data_ready;       // fft_core_v2 -> frame_buffer (backpressure)
+    wire        re_stream_req;        // fft_core_v2 -> frame_buffer (recovery)
 
-    // feature_extractor outputs
-    wire        fft_consumed;     // feature_extractor -> (not connected to fft_core -- ok)
+    // feature_extractor_v2 outputs
+    wire        fft_consumed;         // feature_extractor_v2 -> (informational)
     wire [2055:0] features_packed;
     wire        features_valid;
 
@@ -78,24 +79,26 @@ module tb_handshake_chain;
         .frame_sample_valid (frame_sample_valid)
     );
 
-    fft_core fft (
+    fft_core_v2 fft (
         .clk              (clk),
         .rst_n            (rst_n),
         .frame_sample     (frame_sample),
         .frame_sample_valid (frame_sample_valid),
         .frame_consumed   (frame_consumed),
-        .fft_bins_packed  (fft_bins_packed),
-        .fft_done         (fft_done),
+        .fft_bin_data     (fft_bin_data),
+        .fft_bin_valid    (fft_bin_valid),
+        .fft_bin_last     (fft_bin_last),
         .fft_ready        (fft_ready),
         .fft_data_ready   (fft_data_ready),
         .re_stream_req    (re_stream_req)
     );
 
-    feature_extractor feat_ext (
+    feature_extractor_v2 feat_ext (
         .clk              (clk),
         .rst_n            (rst_n),
-        .fft_bins_packed  (fft_bins_packed),
-        .fft_valid        (fft_done),
+        .fft_bin_data     (fft_bin_data),
+        .fft_bin_valid    (fft_bin_valid),
+        .fft_bin_last     (fft_bin_last),
         .fft_consumed     (fft_consumed),
         .features_packed  (features_packed),
         .features_valid   (features_valid)
@@ -110,54 +113,51 @@ module tb_handshake_chain;
     end
 
     //==========================================================================
-    // Handshake Event Counters  (blocking assigns OK in always @posedge for TB)
+    // Handshake Event Counters
     //==========================================================================
     integer frame_ready_rise_count;
     integer frame_consumed_rise_count;
-    integer fft_done_rise_count;
+    integer fft_bin_last_rise_count;
     integer features_valid_rise_count;
     integer re_stream_rise_count;
 
-    reg frame_ready_prev, frame_consumed_prev, fft_done_prev, features_valid_prev;
+    reg frame_ready_prev, frame_consumed_prev, fft_bin_last_prev, features_valid_prev;
     reg re_stream_prev;
 
     initial begin
         frame_ready_rise_count     = 0;
         frame_consumed_rise_count  = 0;
-        fft_done_rise_count        = 0;
+        fft_bin_last_rise_count    = 0;
         features_valid_rise_count  = 0;
         re_stream_rise_count       = 0;
         frame_ready_prev           = 0;
         frame_consumed_prev        = 0;
-        fft_done_prev              = 0;
+        fft_bin_last_prev          = 0;
         features_valid_prev        = 0;
         re_stream_prev             = 0;
     end
 
     always @(posedge clk) begin
-        // Rising edge detectors
         if (frame_ready && !frame_ready_prev) begin
             frame_ready_rise_count = frame_ready_rise_count + 1;
-            $display("[%8t ns] frame_ready   ASSERTED  (count=%0d)", $time, frame_ready_rise_count);
+            $display("[%8t ns] frame_ready    ASSERTED  (count=%0d)", $time, frame_ready_rise_count);
         end
-        if (!frame_ready && frame_ready_prev) begin
-            $display("[%8t ns] frame_ready   deasserted -> frame consumed OK", $time);
-        end
+        if (!frame_ready && frame_ready_prev)
+            $display("[%8t ns] frame_ready    deasserted -> frame consumed OK", $time);
 
         if (frame_consumed && !frame_consumed_prev) begin
             frame_consumed_rise_count = frame_consumed_rise_count + 1;
             $display("[%8t ns] frame_consumed PULSE     (count=%0d)", $time, frame_consumed_rise_count);
         end
 
-        if (fft_done && !fft_done_prev) begin
-            fft_done_rise_count = fft_done_rise_count + 1;
-            $display("[%8t ns] fft_done      PULSE     (count=%0d)", $time, fft_done_rise_count);
+        if (fft_bin_last && !fft_bin_last_prev) begin
+            fft_bin_last_rise_count = fft_bin_last_rise_count + 1;
+            $display("[%8t ns] fft_bin_last   PULSE     (count=%0d)", $time, fft_bin_last_rise_count);
         end
 
         if (features_valid && !features_valid_prev) begin
             features_valid_rise_count = features_valid_rise_count + 1;
-            $display("[%8t ns] features_valid PULSE    (count=%0d)", $time, features_valid_rise_count);
-            // Print a few feature values to sanity-check they're nonzero
+            $display("[%8t ns] features_valid PULSE     (count=%0d)", $time, features_valid_rise_count);
             $display("           features[0]=%0d  features[10]=%0d  features[100]=%0d",
                      $signed(features_packed[7:0]),
                      $signed(features_packed[87:80]),
@@ -166,12 +166,12 @@ module tb_handshake_chain;
 
         if (re_stream_req && !re_stream_prev) begin
             re_stream_rise_count = re_stream_rise_count + 1;
-            $display("[%8t ns] re_stream_req PULSE     (count=%0d)", $time, re_stream_rise_count);
+            $display("[%8t ns] re_stream_req  PULSE     (count=%0d)", $time, re_stream_rise_count);
         end
 
         frame_ready_prev      <= frame_ready;
         frame_consumed_prev   <= frame_consumed;
-        fft_done_prev         <= fft_done;
+        fft_bin_last_prev     <= fft_bin_last;
         features_valid_prev   <= features_valid;
         re_stream_prev        <= re_stream_req;
     end
@@ -179,26 +179,20 @@ module tb_handshake_chain;
     //==========================================================================
     // fft_ready monitoring — verify frame_buffer waits for it
     //==========================================================================
-    // Track whether frame_sample_valid ever fires while fft_ready is LOW.
-    // This would indicate the synchronization gate is not working.
     integer stream_before_ready_count;
     initial stream_before_ready_count = 0;
 
     always @(posedge clk) begin
         if (frame_sample_valid && !fft_ready && fft.state == 3'd0) begin
-            // frame_buffer streaming while fft_core is in IDLE but not ready
             stream_before_ready_count = stream_before_ready_count + 1;
         end
     end
 
     //==========================================================================
     // Stimulus: inject FRAME_SIZE + FRAME_OVERLAP audio samples (covers 2 frames)
-    //  - Samples are injected every SAMPLE_PERIOD clock cycles to stay faster
-    //    than real I2S but still test the handshake correctly.
-    //  - Real I2S = 1 sample per 3125 cycles @ 50 MHz.  Use 10 cycles here.
     //==========================================================================
-    localparam SAMPLE_PERIOD = 10;   // cycles between sample_valid pulses
-    localparam TOTAL_SAMPLES = 1024; // enough for 2 full frames (512 + 512 overlap)
+    localparam SAMPLE_PERIOD = 10;    // cycles between sample_valid pulses
+    localparam TOTAL_SAMPLES = 1024;  // enough for 2 full frames (512 + 512 overlap)
 
     integer i;
     integer fail_count;
@@ -209,27 +203,23 @@ module tb_handshake_chain;
         sample_valid = 1'b0;
         fail_count   = 0;
 
-        // Hold reset for 20 cycles
         repeat (20) @(posedge clk);
         rst_n = 1'b1;
         repeat (5)  @(posedge clk);
 
         $display("");
         $display("========================================");
-        $display("  Handshake Chain Test");
-        $display("  frame_buffer -> fft_core -> feat_ext");
+        $display("  Handshake Chain Test (v2 serial)");
+        $display("  frame_buffer -> fft_core_v2 -> feature_extractor_v2");
         $display("  Injecting %0d samples @ 1 per %0d cycles", TOTAL_SAMPLES, SAMPLE_PERIOD);
         $display("========================================");
 
-        // Inject samples with a simple ramp (incrementing values make
-        // it easy to verify ordering in the waveform viewer)
         for (i = 0; i < TOTAL_SAMPLES; i = i + 1) begin
             @(posedge clk);
             audio_sample <= i[15:0];
             sample_valid <= 1'b1;
             @(posedge clk);
             sample_valid <= 1'b0;
-            // Idle gap (minus 1 cycle already consumed above)
             repeat (SAMPLE_PERIOD - 2) @(posedge clk);
         end
 
@@ -242,7 +232,6 @@ module tb_handshake_chain;
             end
         end
 
-        // Give a few extra cycles for last signals to settle
         repeat (200) @(posedge clk);
 
         //----------------------------------------------------------------------
@@ -266,17 +255,17 @@ module tb_handshake_chain;
             $display("[PASS] frame_consumed fired %0d times (>= 2 expected)",
                      frame_consumed_rise_count);
         else begin
-            $display("[FAIL] frame_consumed fired only %0d times -- fft_core stuck?",
+            $display("[FAIL] frame_consumed fired only %0d times -- fft_core_v2 stuck?",
                      frame_consumed_rise_count);
             fail_count = fail_count + 1;
         end
 
-        if (fft_done_rise_count >= 2)
-            $display("[PASS] fft_done fired %0d times (>= 2 expected)",
-                     fft_done_rise_count);
+        if (fft_bin_last_rise_count >= 2)
+            $display("[PASS] fft_bin_last fired %0d times (>= 2 expected)",
+                     fft_bin_last_rise_count);
         else begin
-            $display("[FAIL] fft_done fired only %0d times -- FFT collection stuck?",
-                     fft_done_rise_count);
+            $display("[FAIL] fft_bin_last fired only %0d times -- FFT output stuck?",
+                     fft_bin_last_rise_count);
             fail_count = fail_count + 1;
         end
 
@@ -284,13 +273,11 @@ module tb_handshake_chain;
             $display("[PASS] features_valid fired %0d times (>= 2 expected)",
                      features_valid_rise_count);
         else begin
-            $display("[FAIL] features_valid fired only %0d times -- feature_extractor stuck?",
+            $display("[FAIL] features_valid fired only %0d times -- feature_extractor_v2 stuck?",
                      features_valid_rise_count);
             fail_count = fail_count + 1;
         end
 
-        // Verify no deadlock: frame_ready may be at most 1 ahead of frame_consumed
-        // (the last frame can still be in-flight when stimulus ends).
         if (frame_ready_rise_count - frame_consumed_rise_count <= 1)
             $display("[PASS] No deadlock: frame_ready=%0d  frame_consumed=%0d  (delta <= 1 OK)",
                      frame_ready_rise_count, frame_consumed_rise_count);
@@ -300,23 +287,19 @@ module tb_handshake_chain;
             fail_count = fail_count + 1;
         end
 
-        // Verify fft_ready gate: frame_buffer should never stream while fft not ready
         if (stream_before_ready_count == 0)
-            $display("[PASS] frame_buffer never streamed while fft_core not ready");
+            $display("[PASS] frame_buffer never streamed while fft_core_v2 not ready");
         else begin
-            $display("[FAIL] frame_buffer streamed %0d cycles while fft_core in IDLE but not ready",
+            $display("[FAIL] frame_buffer streamed %0d cycles while fft_core_v2 in IDLE but not ready",
                      stream_before_ready_count);
             fail_count = fail_count + 1;
         end
 
-        // Verify re_stream_req did not fire (normal operation should not need it)
         if (re_stream_rise_count == 0)
             $display("[PASS] re_stream_req never fired (no recovery needed)");
-        else begin
+        else
             $display("[INFO] re_stream_req fired %0d times (recovery was triggered)",
                      re_stream_rise_count);
-            // Not a fail — recovery firing is OK, just informational
-        end
 
         $display("----------------------------------------");
         if (fail_count == 0)
@@ -330,14 +313,14 @@ module tb_handshake_chain;
     end
 
     //==========================================================================
-    // Global timeout (2.5 ms sim time = plenty at 50 MHz)
+    // Global timeout (2.5 ms sim time)
     //==========================================================================
     initial begin
         #2_500_000;
         $display("[TIMEOUT] Simulation exceeded 2.5 ms -- pipeline likely deadlocked.");
-        $display("  frame_ready=%0d  frame_consumed=%0d  fft_done=%0d  features_valid=%0d",
+        $display("  frame_ready=%0d  frame_consumed=%0d  fft_bin_last=%0d  features_valid=%0d",
                  frame_ready_rise_count, frame_consumed_rise_count,
-                 fft_done_rise_count, features_valid_rise_count);
+                 fft_bin_last_rise_count, features_valid_rise_count);
         $finish;
     end
 

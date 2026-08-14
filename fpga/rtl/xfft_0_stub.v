@@ -25,41 +25,28 @@ module xfft_0 (
     output wire        s_axis_data_tready,
     input  wire        s_axis_data_tlast,
 
-    // Output data channel
-    output reg  [31:0] m_axis_data_tdata,
-    output wire [7:0]  m_axis_data_tuser,
+    // Output data channel (Real Time: no tready; Unscaled: no tuser/status)
+    // 64-bit: real=[25:0], imag=[57:32]
+    output reg  [63:0] m_axis_data_tdata,
     output reg         m_axis_data_tvalid,
-    input  wire        m_axis_data_tready,
     output reg         m_axis_data_tlast,
-
-    // Status channel (unused in wrapper but must be driven)
-    output wire [7:0]  m_axis_status_tdata,
-    output wire        m_axis_status_tvalid,
-    input  wire        m_axis_status_tready,
 
     // Event outputs
     output wire        event_frame_started,
     output wire        event_tlast_unexpected,
     output wire        event_tlast_missing,
-    output wire        event_status_channel_halt,
-    output wire        event_data_in_channel_halt,
-    output wire        event_data_out_channel_halt
+    output wire        event_data_in_channel_halt
 );
 
     // Always ready - pipelined streaming FFT holds tready during input
     assign s_axis_config_tready          = 1'b1;
     assign s_axis_data_tready            = 1'b1;
 
-    // Unused outputs tied off
-    assign m_axis_data_tuser             = 8'h00;
-    assign m_axis_status_tdata           = 8'h00;
-    assign m_axis_status_tvalid          = 1'b0;
+    // Unused event outputs
     assign event_frame_started           = 1'b0;
     assign event_tlast_unexpected        = 1'b0;
     assign event_tlast_missing           = 1'b0;
-    assign event_status_channel_halt     = 1'b0;
     assign event_data_in_channel_halt    = 1'b0;
-    assign event_data_out_channel_halt   = 1'b0;
 
     //--------------------------------------------------------------------------
     // Processing latency pipeline
@@ -78,7 +65,7 @@ module xfft_0 (
         tlast_pipe         = {LATENCY_CYCLES{1'b0}};
         out_active         = 1'b0;
         out_counter        = 9'd0;
-        m_axis_data_tdata  = 32'h0;
+        m_axis_data_tdata  = 64'h0;
         m_axis_data_tvalid = 1'b0;
         m_axis_data_tlast  = 1'b0;
     end
@@ -96,9 +83,12 @@ module xfft_0 (
 
         if (out_active) begin
             // Drive valid and deterministic nonzero bin data so log features
-            // produce nonzero results. Format: [31:16]=real, [15:0]=imag.
+            // produce nonzero results.
+            // 64-bit format: real=[25:0], imag=[57:32]. Pack nonzero values
+            // in those fields; unused bits in each 32-bit half are zero.
+            // real=512 (26-bit), imag=128 (26-bit)
             m_axis_data_tvalid <= 1'b1;
-            m_axis_data_tdata  <= {16'sh0200, 16'sh0080};  // real=512, imag=128
+            m_axis_data_tdata  <= {6'b0, 26'd128, 6'b0, 26'd512};
 
             // Advance unconditionally each cycle (pipelined streaming mode -
             // consumer is always ready during output once tready goes high).

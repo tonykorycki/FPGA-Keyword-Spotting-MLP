@@ -34,7 +34,7 @@ module top (
 
     // Reset synchronization
     reg [2:0] reset_sync;
-    (* mark_debug = "true" *) wire rst_n;
+    wire rst_n;
 
     always @(posedge clk) begin
         reset_sync <= {reset_sync[1:0], ~btnC};
@@ -43,7 +43,7 @@ module top (
     assign rst_n = reset_sync[2];
 
     // I2S Audio Receiver
-    (* mark_debug = "true" *) wire [15:0] audio_sample;
+    wire [15:0] audio_sample;
     (* mark_debug = "true" *) wire        sample_valid;
 
     i2s_rx i2s_receiver (
@@ -58,7 +58,7 @@ module top (
 
     // Frame Buffer (serial output)
     (* mark_debug = "true" *) wire        frame_ready;
-    (* mark_debug = "true" *) wire [15:0] frame_sample;
+    wire [15:0] frame_sample;
     (* mark_debug = "true" *) wire        frame_sample_valid;
     (* mark_debug = "true" *) wire        frame_consumed;
 
@@ -76,22 +76,28 @@ module top (
         .frame_sample_valid(frame_sample_valid)
     );
 
-    // FFT Core - Xilinx FFT IP Wrapper (serial input)
-    (* mark_debug = "true" *) wire         fft_done;
-    (* mark_debug = "true" *) wire         fft_ready;        // fft_core ready to accept a stream
-    wire                               fft_data_ready;   // FFT IP backpressure (tready passthrough)
-    (* mark_debug = "true" *) wire     re_stream_req;    // Recovery: fft_core missed stream
-    wire [8223:0]                      fft_bins_packed;  // 257 bins x 32 bits (real+imag)
-    (* mark_debug = "true" *) wire       fft_consumed;     // Handshake from feature extractor
+    // FFT Core - Xilinx FFT IP Wrapper (serial input, serial output)
+    (* mark_debug = "true" *) wire        fft_bin_last;     // Marks last bin (replaces fft_done)
+    (* mark_debug = "true" *) wire [31:0]  fft_bin_data;     // One bin per cycle [31:16]=real,[15:0]=imag
+    (* mark_debug = "true" *) wire         fft_bin_valid;    // Bin data valid
+    (* mark_debug = "true" *) wire        fft_ready;        // fft_core ready to accept a stream
+    wire                                  fft_data_ready;   // FFT IP backpressure (tready passthrough)
+    wire        re_stream_req;    // Recovery: fft_core missed stream
+    wire        fft_consumed;     // Handshake from feature extractor
 
-    fft_core fft (
+`ifdef FFT_BYPASS
+    fft_bypass fft (
+`else
+    fft_core_v2 fft (
+`endif
         .clk(clk),
         .rst_n(rst_n),
         .frame_sample(frame_sample),
         .frame_sample_valid(frame_sample_valid),
         .frame_consumed(frame_consumed),
-        .fft_bins_packed(fft_bins_packed),
-        .fft_done(fft_done),
+        .fft_bin_data(fft_bin_data),
+        .fft_bin_valid(fft_bin_valid),
+        .fft_bin_last(fft_bin_last),
         .fft_ready(fft_ready),
         .fft_data_ready(fft_data_ready),
         .re_stream_req(re_stream_req)
@@ -102,11 +108,12 @@ module top (
     (* mark_debug = "true" *) wire         features_valid_int8;
     wire [2055:0]                      features_packed_int8;  // 257 x 8 bits = 2056 bits
 
-    feature_extractor feat_extr (
+    feature_extractor_v2 feat_extr (
         .clk(clk),
         .rst_n(rst_n),
-        .fft_bins_packed(fft_bins_packed),
-        .fft_valid(fft_done),
+        .fft_bin_data(fft_bin_data),
+        .fft_bin_valid(fft_bin_valid),
+        .fft_bin_last(fft_bin_last),
         .fft_consumed(fft_consumed),           // Output: tells FFT "data received"
         .features_packed(features_packed_int8),
         .features_valid(features_valid_int8)
@@ -170,9 +177,9 @@ module top (
     // Neural Network Inference (3-layer MLP: 257->32->16->2)
     (* mark_debug = "true" *) wire        inference_done;
     (* mark_debug = "true" *) wire        prediction;
-    wire [63:0]                            logits_packed;
+    (* mark_debug = "true" *) wire [63:0]  logits_packed;
     wire signed [31:0]                     logits [0:1];
-    (* mark_debug = "true" *) wire         detection_event;
+    wire         detection_event;
 
     // Unpack logits
     assign logits[0] = logits_packed[31:0];
@@ -196,7 +203,7 @@ module top (
     reg led_processing;
     reg led_inference;
     reg [25:0] detection_timer;
-    (* mark_debug = "true" *) reg [15:0] detection_count;
+    reg [15:0] detection_count;
 
     // Stretch short pipeline pulses so status is visible on physical LEDs.
     localparam [22:0] ACTIVITY_HOLD = 23'd2_500_000;  // 50ms @ 50MHz
@@ -230,7 +237,7 @@ module top (
             if (frame_ready) frame_act_timer <= ACTIVITY_HOLD;
             else if (frame_act_timer != 23'd0) frame_act_timer <= frame_act_timer - 23'd1;
 
-            if (fft_done) fft_act_timer <= ACTIVITY_HOLD;
+            if (fft_bin_last) fft_act_timer <= ACTIVITY_HOLD;
             else if (fft_act_timer != 23'd0) fft_act_timer <= fft_act_timer - 23'd1;
 
             if (frame_features_valid) feat_act_timer <= ACTIVITY_HOLD;

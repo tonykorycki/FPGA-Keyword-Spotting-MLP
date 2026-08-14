@@ -153,7 +153,7 @@ module fft_core (
             data_in_tvalid <= 1'b0;
             data_in_tdata <= 32'd0;
             data_in_tlast <= 1'b0;
-            data_out_tready <= 1'b0;
+            data_out_tready <= 1'b1;  // Always drain output; IP backpressures input if output stalls
             status_tready <= 1'b1;  // Always ready for status
             frame_consumed <= 1'b0;
             fft_done <= 1'b0;
@@ -243,7 +243,6 @@ module fft_core (
                     data_in_tlast <= 1'b0;
                     if (data_out_tvalid) begin
                         state <= STATE_COLLECT;
-                        data_out_tready <= 1'b1;
                         sample_counter <= 10'd0;
                     end
                 end
@@ -261,7 +260,7 @@ module fft_core (
                         
                         if (data_out_tlast || sample_counter == 10'd256) begin
                             // Done collecting (either TLAST or 257 bins)
-                            data_out_tready <= 1'b0;
+                            // data_out_tready stays 1 — remaining bins (257-511) drain automatically
                             state <= STATE_DONE;
                         end else begin
                             sample_counter <= sample_counter + 10'd1;

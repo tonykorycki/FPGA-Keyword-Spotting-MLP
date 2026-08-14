@@ -78,7 +78,7 @@ module tb_fft;
         
         // Display results (just a subset for verification)
         $display("FFT Results (first 16 bins):");
-        for (integer i = 0; i < 16; i++) begin
+        for (integer i = 0; i < 16; i = i + 1) begin
             $display("Bin %d: Real = %d, Imag = %d", i, y_real[i], y_imag[i]);
         end
         
